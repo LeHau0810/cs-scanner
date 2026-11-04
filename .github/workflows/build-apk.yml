@@ -32,7 +32,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install flet opencv-python-headless pillow numpy pypdf
-          # Kiểm tra nếu main.py nằm trong src/ thì trỏ tới src/main.py, nếu không thì dùng main.py
+          
+          # Tự động chấp nhận cài đặt Flutter không bị kẹt ở màn hình [y/n]
+          export FLET_NON_INTERACTIVE=true
+          
           if [ -f "src/main.py" ]; then
             flet build apk src/main.py --verbose
           else
