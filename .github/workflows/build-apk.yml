@@ -36,11 +36,8 @@ jobs:
           # Tự động chấp nhận cài đặt Flutter không bị kẹt ở màn hình [y/n]
           export FLET_NON_INTERACTIVE=true
           
-          if [ -f "src/main.py" ]; then
-            flet build apk src/main.py --verbose
-          else
-            flet build apk main.py --verbose
-          fi
+          # Lệnh build APK trỏ vào thư mục hiện tại chứa pyproject.toml và main.py
+          flet build apk . --verbose
 
       - name: 6. Upload APK Artifact
         uses: actions/upload-artifact@v4
