@@ -1,6 +1,0 @@
-flet==0.24.1
-opencv-python-headless
-pillow
-numpy
-pypdf
-qrcode
