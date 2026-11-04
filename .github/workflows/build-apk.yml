@@ -30,9 +30,14 @@ jobs:
 
       - name: 5. Install dependencies and Build APK
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install flet opencv-python-headless pillow numpy pypdf
-          flet build apk --verbose
+          # Kiểm tra nếu main.py nằm trong src/ thì trỏ tới src/main.py, nếu không thì dùng main.py
+          if [ -f "src/main.py" ]; then
+            flet build apk src/main.py --verbose
+          else
+            flet build apk main.py --verbose
+          fi
 
       - name: 6. Upload APK Artifact
         uses: actions/upload-artifact@v4
