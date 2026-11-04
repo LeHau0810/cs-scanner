@@ -1,41 +1,41 @@
-name: Build APK
+name: Build Flet APK
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:   # cho phép bấm nút chạy tay trên tab Actions
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
     steps:
-      - name: Lấy mã nguồn
+      - name: 1. Checkout code
         uses: actions/checkout@v4
 
-      - name: Cài Python
+      - name: 2. Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.11'
 
-      - name: Cài Java 17
+      - name: 3. Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "17"
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Cài Flet
-        run: pip install -U flet
+      - name: 4. Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
 
-      - name: Build APK
-        env:
-          PYTHONIOENCODING: utf-8
-        run: flet build apk --verbose
+      - name: 5. Install dependencies and Build APK
+        run: |
+          pip install --upgrade pip
+          pip install flet opencv-python-headless pillow numpy pypdf
+          flet build apk --verbose
 
-      - name: Tải APK lên mục Artifacts
+      - name: 6. Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CS-Scanner-APK
+          name: PyScanner-Pro-APK
           path: build/apk/*.apk
-          retention-days: 30
