@@ -33,10 +33,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet opencv-python-headless pillow numpy pypdf
           
-          # Tự động chấp nhận cài đặt Flutter không bị kẹt ở màn hình [y/n]
+          # Biến môi trường chống kẹt [y/n]
           export FLET_NON_INTERACTIVE=true
           
-          # Lệnh build APK trỏ vào thư mục hiện tại chứa pyproject.toml và main.py
+          # LỆNH CHUẨN: Dùng dấu chấm (.) để build toàn bộ thư mục gốc chứa main.py và pyproject.toml
           flet build apk . --verbose
 
       - name: 6. Upload APK Artifact
