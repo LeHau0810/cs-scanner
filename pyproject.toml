@@ -1,18 +1,20 @@
 [project]
-name = "cs-scanner"
+name = "cs_scanner"
 version = "5.0.0"
 description = "CS Scanner Pro"
 dependencies = [
-  "flet>=0.70",
-  "numpy",
-  "opencv-python",
+    "flet",
+    "opencv-python-headless",
+    "pillow",
+    "numpy",
+    "pypdf"
 ]
 
 [tool.flet]
-product = "CS Scanner"
-org = "com.cs"
+org = "com.csscanner"
+product = "CS Scanner Pro"
 
-[tool.flet.android.permission]
-"android.permission.READ_MEDIA_IMAGES" = true
-"android.permission.READ_EXTERNAL_STORAGE" = true
-"android.permission.WRITE_EXTERNAL_STORAGE" = true
+[tool.flet.android]
+permission.CAMERA = true
+permission.READ_EXTERNAL_STORAGE = true
+permission.WRITE_EXTERNAL_STORAGE = true
