@@ -29,7 +29,8 @@ Colors = getattr(ft, "Colors", None) or ft.colors
 Icons = getattr(ft, "Icons", None) or ft.icons
 FIT = getattr(ft, "BoxFit", None) or ft.ImageFit
 IMG_OLD = hasattr(ft.Image, "src_base64")
-OLD_PICKER = hasattr(ft, "FilePickerResultEvent")
+NEW_FLET = hasattr(ft, "Service") or hasattr(ft, "Share")
+OLD_PICKER = hasattr(ft, "FilePickerResultEvent") and not NEW_FLET
 Btn = getattr(ft, "ElevatedButton", None) or ft.Button
 OutBtn = getattr(ft, "OutlinedButton", None) or ft.Button
 DDOpt = getattr(ft, "DropdownOption", None) or ft.dropdown.Option
@@ -397,21 +398,27 @@ def save_page_meta(pg):
     meta = {k: pg[k] for k in SETTING_KEYS}
     meta["id"] = pg["id"]
     meta["corners"] = np.asarray(pg["corners"]).tolist()
+    meta["name"] = pg.get("name", "")
     with open(p_meta(pg["id"]), "w", encoding="utf-8") as f:
         json.dump(meta, f)
+
+
+def natural_key(text):
+    """Sắp xếp tự nhiên: IMG_2 đứng trước IMG_10."""
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", text or "")]
 
 
 def limit_side(img, max_side=3000):
     return fit_max(img, max_side)
 
 
-def create_page_from_raw(raw_bgr, auto_crop=True, corners=None, **settings):
+def create_page_from_raw(raw_bgr, auto_crop=True, corners=None, name="", **settings):
     pid = uuid.uuid4().hex[:10]
     raw = limit_side(raw_bgr, 3000)
     write_jpg(p_raw(pid), raw, 93)
     if corners is None:
         corners = auto_detect_corners(raw) if auto_crop else full_corners(raw.shape[1], raw.shape[0])
-    pg = {"id": pid, "corners": np.array(corners, dtype="float32"), "prev": None,
+    pg = {"id": pid, "name": name, "corners": np.array(corners, dtype="float32"), "prev": None,
           "thumb_b64": "", "view_b64": ""}
     for k in SETTING_KEYS:
         pg[k] = settings.get(k, DEFAULTS[k])
@@ -427,7 +434,7 @@ def load_page(pid):
             meta = json.load(f)
         if not os.path.exists(p_warp(pid)):
             return None
-        pg = {"id": pid, "corners": np.array(meta["corners"], dtype="float32"), "prev": None,
+        pg = {"id": pid, "name": meta.get("name", ""), "corners": np.array(meta["corners"], dtype="float32"), "prev": None,
               "thumb_b64": "", "view_b64": ""}
         for k in SETTING_KEYS:
             pg[k] = meta.get(k, DEFAULTS[k])
@@ -1203,6 +1210,51 @@ def main(page: ft.Page):
         save_doc(doc)
         refresh_studio_ui()
 
+    def sort_pages(mode):
+        doc = cur_doc()
+        if len(doc["pages"]) < 2:
+            return
+        snapshot_doc(doc)
+        cur_id = doc["pages"][app_data["active_page_idx"]]["id"]
+        if mode == "name":
+            doc["pages"].sort(key=lambda pg: natural_key(pg.get("name", "")))
+        else:
+            doc["pages"].reverse()
+        app_data["active_page_idx"] = [pg["id"] for pg in doc["pages"]].index(cur_id)
+        save_doc(doc)
+        refresh_studio_ui()
+        toast("🔤 Đã sắp xếp theo tên file gốc" if mode == "name" else "🔃 Đã đảo ngược thứ tự")
+
+    def move_to_dialog(e=None):
+        doc = cur_doc()
+        n = len(doc["pages"])
+        tf = ft.TextField(label=f"Vị trí mới (từ 1 đến {n})", keyboard_type=ft.KeyboardType.NUMBER,
+                          autofocus=True)
+
+        def go(ev):
+            try:
+                j = int((tf.value or "").strip())
+            except ValueError:
+                j = 0
+            if not 1 <= j <= n:
+                tf.error_text = f"Nhập số từ 1 đến {n}"
+                page.update()
+                return
+            snapshot_doc(doc)
+            pg = doc["pages"].pop(app_data["active_page_idx"])
+            doc["pages"].insert(j - 1, pg)
+            app_data["active_page_idx"] = j - 1
+            save_doc(doc)
+            close_dlg(dlg)
+            refresh_studio_ui()
+
+        tf.on_submit = go
+        dlg = ft.AlertDialog(
+            modal=True, title=ft.Text("↔ Chuyển trang đang xem tới vị trí"), content=tf,
+            actions=[ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
+                     Btn("Chuyển", bgcolor=CS_TEAL, color=WHITE, on_click=go)])
+        open_dlg(dlg)
+
     def undo_last(e=None):
         doc = cur_doc()
         if not doc["undo"]:
@@ -1324,6 +1376,11 @@ def main(page: ft.Page):
                           on_click=lambda _: move_active_page(-1)),
             ft.IconButton(Icons.ARROW_CIRCLE_RIGHT_OUTLINED, tooltip="Dời trang sang phải",
                           on_click=lambda _: move_active_page(1)),
+            ft.PopupMenuButton(icon=Icons.SORT, icon_color="#3949AB", tooltip="Sắp xếp trang", items=[
+                pm_item("↔ Chuyển trang này tới vị trí số...", move_to_dialog),
+                pm_item("🔤 Sắp xếp theo tên file gốc", lambda _: sort_pages("name")),
+                pm_item("🔃 Đảo ngược toàn bộ thứ tự", lambda _: sort_pages("reverse")),
+            ]),
             ft.IconButton(Icons.DELETE_OUTLINE, icon_color=Colors.RED_600, tooltip="Xóa trang",
                           on_click=delete_selected_pages),
         ], scroll=ft.ScrollMode.AUTO, spacing=2)
@@ -1485,12 +1542,27 @@ def main(page: ft.Page):
     # =================================================================
     # 7. TẢI ẢNH LÊN
     # =================================================================
-    import_state = {"new_doc": True, "auto": True}
+    import_state = {"new_doc": True, "auto": True, "order": "name", "reverse": False}
 
     def handle_import(paths):
         if not paths:
             return
         auto, new_doc = import_state["auto"], import_state["new_doc"]
+        order, rev = import_state["order"], import_state["reverse"]
+
+        def _mtime(path):
+            try:
+                return os.path.getmtime(path)
+            except OSError:
+                return 0
+
+        paths = list(paths)
+        if order == "name":
+            paths.sort(key=lambda q: natural_key(os.path.basename(q)))
+        elif order == "time":
+            paths.sort(key=lambda q: (_mtime(q), natural_key(os.path.basename(q))))
+        if rev:
+            paths.reverse()
 
         def work():
             out = []
@@ -1501,7 +1573,7 @@ def main(page: ft.Page):
                     continue
                 if raw is None:
                     continue
-                out.append(create_page_from_raw(raw, auto_crop=auto))
+                out.append(create_page_from_raw(raw, auto_crop=auto, name=os.path.basename(p)))
             return out
 
         def done(new_pages):
@@ -1532,8 +1604,18 @@ def main(page: ft.Page):
         old_picker = ft.FilePicker(on_result=on_old_result)
         page.overlay.append(old_picker)
 
+    new_picker = None
+    if not OLD_PICKER:
+        try:
+            new_picker = ft.FilePicker()
+            if hasattr(page, "services"):
+                page.services.append(new_picker)
+        except Exception:
+            new_picker = None
+
     async def _pick_new():
-        files = await ft.FilePicker().pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
+        picker = new_picker or ft.FilePicker()
+        files = await picker.pick_files(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
         handle_import([f.path for f in (files or []) if getattr(f, "path", None)])
 
     def pick_images():
@@ -1546,14 +1628,24 @@ def main(page: ft.Page):
         import_state["new_doc"] = new_doc
         crop_chk = ft.Switch(label="Tự động cắt bỏ nền bàn & kéo thẳng trang giấy", value=True, active_color=CS_TEAL)
 
+        dd_order = ft.Dropdown(label="Thứ tự các trang khi tải lên", value="name", options=[
+            DDOpt(key="name", text="Theo tên file (IMG_001, IMG_002...)"),
+            DDOpt(key="time", text="Theo thời gian chụp / lưu file"),
+            DDOpt(key="pick", text="Giữ nguyên thứ tự máy trả về")])
+        rev_chk = ft.Switch(label="Đảo ngược thứ tự (chụp từ mới đến cũ)", value=False, active_color=CS_TEAL)
+
         def pick_now(auto_c):
             import_state["auto"] = auto_c
+            import_state["order"] = dd_order.value or "name"
+            import_state["reverse"] = bool(rev_chk.value)
             close_dlg(bs)
             pick_images()
 
         bs = ft.BottomSheet(ft.Container(padding=20, bgcolor=WHITE, content=ft.Column([
             ft.Text("Tải Ảnh Lên (chọn 1 hoặc nhiều ảnh)", weight=ft.FontWeight.BOLD, size=16),
             crop_chk,
+            dd_order,
+            rev_chk,
             ft.ListTile(leading=ft.Icon(Icons.CROP_FREE, color=CS_TEAL, size=32),
                         title=ft.Text("Tải ảnh & tự động cắt bỏ nền ngoài (khuyên dùng)", weight=ft.FontWeight.BOLD),
                         subtitle=ft.Text("Tự nhận diện 4 góc tờ giấy, cắt mặt bàn và làm phẳng"),
@@ -1565,7 +1657,7 @@ def main(page: ft.Page):
         ], tight=True, spacing=6)), open=True)
         open_dlg(bs)
 
-    page.add(busy_bar, root_body)
+    page.add(ft.SafeArea(content=ft.Column([busy_bar, root_body], expand=True, spacing=0), expand=True))
     render_home_view()
 
 
@@ -1575,4 +1667,3 @@ if __name__ == "__main__":
         runner(main)
     except TypeError:
         ft.app(target=main)
-
