@@ -35,6 +35,36 @@ Btn = getattr(ft, "ElevatedButton", None) or ft.Button
 OutBtn = getattr(ft, "OutlinedButton", None) or ft.Button
 DDOpt = getattr(ft, "DropdownOption", None) or ft.dropdown.Option
 
+
+def _tolerant(cls):
+    """Nếu Flet bản này không có 1 tham số (do đổi tên giữa các phiên bản), bỏ tham số đó và thử lại."""
+    def build(*args, **kw):
+        for _ in range(10):
+            try:
+                return cls(*args, **kw)
+            except TypeError as ex:
+                m = re.search(r"unexpected keyword argument '(\w+)'", str(ex))
+                if not m or m.group(1) not in kw:
+                    raise
+                print(f"[compat] bỏ tham số không hỗ trợ: {cls.__name__}.{m.group(1)}", flush=True)
+                kw.pop(m.group(1))
+        return cls(*args, **kw)
+
+    build.__name__ = getattr(cls, "__name__", "control")
+    return build
+
+
+for _n in ("TextField", "Switch", "Checkbox", "Slider", "Dropdown", "Container", "Text", "Row", "Column",
+           "IconButton", "Image", "ProgressBar", "PopupMenuButton", "ListTile", "Card", "AlertDialog",
+           "BottomSheet", "SnackBar", "GestureDetector", "InteractiveViewer", "Stack", "Icon", "Divider",
+           "TextButton", "ElevatedButton", "OutlinedButton", "Button", "SafeArea"):
+    _c = getattr(ft, _n, None)
+    if isinstance(_c, type):
+        setattr(ft, _n, _tolerant(_c))
+
+Btn = getattr(ft, "ElevatedButton", None) or ft.Button
+OutBtn = getattr(ft, "OutlinedButton", None) or ft.Button
+
 PLACEHOLDER_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 )
@@ -806,7 +836,8 @@ def main(page: ft.Page):
             toast("⚠️ Không có trang nào để xuất!", Colors.ORANGE_800)
             return
         ext = ".pdf" if fmt == "pdf" else ".jpg"
-        tf = ft.TextField(value=default_name, label="Tên file", suffix_text=ext, autofocus=True)
+        tf = ft.TextField(value=default_name, label=f"Tên file (đuôi {ext})", autofocus=True,
+                          **({"suffix": ext} if NEW_FLET else {"suffix_text": ext}))
         dd_q = ft.Dropdown(label="Chất lượng", value="mid", options=[
             DDOpt(key="low", text="Nhỏ gọn · 150 DPI (gửi Zalo/email)"),
             DDOpt(key="mid", text="Cân bằng · 200 DPI"),
