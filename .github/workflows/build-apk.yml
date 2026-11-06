@@ -41,3 +41,5 @@ jobs:
           name: CS-Scanner-APK
           path: build/apk/*.apk
           retention-days: 30
+[tool.flet.app]
+path = "src"
