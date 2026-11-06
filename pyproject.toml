@@ -13,6 +13,9 @@ dependencies = [
 product = "CS Scanner"
 org = "com.cs"
 
+[tool.flet.app]
+path = "src"
+
 [tool.flet.android.permission]
 "android.permission.READ_MEDIA_IMAGES" = true
 "android.permission.READ_EXTERNAL_STORAGE" = true
