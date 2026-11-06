@@ -25,6 +25,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Chấp nhận giấy phép Android SDK
+        run: |
+          SDKM="${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDKM" ]; then yes | "$SDKM" --licenses > /dev/null || true; fi
+
       - name: Cài Flet
         run: pip install -U flet
 
@@ -41,6 +46,3 @@ jobs:
           name: CS-Scanner-APK
           path: build/apk/*.apk
           retention-days: 30
-          
-[tool.flet.app]
-path = "src"
