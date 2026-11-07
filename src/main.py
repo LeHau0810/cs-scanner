@@ -1,18 +1,10 @@
 """
-CS Scanner Pro V6.2 - Live Camera & Full Suite Edition
-- MỚI: Chụp ảnh trực tiếp từ Camera trong app (nhận diện 4 góc giấy & báo rung/mờ thời gian thực)
-- ĐÃ SỬA: Hoàn tác & Xóa ô che thông tin nhạy cảm (hỗ trợ chạm trực tiếp vào ô để xóa)
-- ĐÃ SỬA: Tương thích Flet 0.21 -> 0.25+ & 0.70+ (page.open / page.close, không còn DeprecationWarning)
-- Đầy đủ 9 tính năng nâng cao:
-  1. Nén PDF tự động theo dung lượng mục tiêu (dưới X MB)
-  2. Thùng rác thông minh (lưu 7 ngày, khôi phục tài liệu & trang lẻ)
-  3. Cảnh báo ảnh mờ / thiếu sáng ngay khi chụp hoặc tải lên
-  4. Sao lưu & Khôi phục toàn bộ dữ liệu ra file .zip
-  5. Đóng dấu chữ mờ (Watermark) hỗ trợ tiếng Việt (Pillow / OpenCV fallback)
-  6. Màn hình che thông tin nhạy cảm (Vẽ ô đen / Làm mờ Pixel / Xóa trắng)
-  7. Ghép 2, 4 hoặc 6 ảnh vào 1 trang A4 chuẩn
-  8. Tách nền chữ ký tự động (chụp trực tiếp hoặc tải ảnh) & Kéo thả vị trí
-  9. Quản lý Thư mục (Folder), Tìm kiếm & Sắp xếp tài liệu
+CS Scanner Pro V6.3 - Mobile UI Edition (Tối ưu bố cục chuẩn Điện thoại)
+- Bố cục Mobile hiện đại: Thanh điều hướng đáy (Bottom Bar), 100% thao tác bằng 1 ngón cái
+- Màn hình Studio chia 3 Tab gọn gàng (Màu & Sáng | Cắt & Xoay | Bảo mật & Ghép) - không phải cuộn dài
+- Thanh công cụ ngữ cảnh ở Trang chủ: chỉ hiện khi tích chọn tài liệu
+- Màn hình Camera chuẩn điện thoại với nút chụp tròn lớn ở giữa đáy
+- Giữ nguyên toàn bộ 10 tính năng cao cấp & bản vá ổn định của V6.2
 """
 import base64
 import json
@@ -272,7 +264,6 @@ def _unique(base: str, filename: str) -> str:
 
 
 def write_output(filename: str, data: bytes) -> str:
-    """Ghi file vào Downloads (nếu được), không được thì vào thư mục exports của app."""
     last = None
     for base in [b for b in (_download_dir(), EXPORT_DIR) if b]:
         try:
@@ -295,7 +286,6 @@ def order_points(pts):
     rect[2] = pts[np.argmax(s)]
     diff = np.diff(pts, axis=1)
     rect[1] = pts[np.argmin(diff)]
-    rect[3] = pts[np.argmin(diff)]
     rect[3] = pts[np.argmax(diff)]
     return rect
 
@@ -305,7 +295,6 @@ def full_corners(w, h):
 
 
 def detect_document_quad(img_bgr):
-    """Trả về (corners_4x2, found_bool)."""
     h, w = img_bgr.shape[:2]
     scale = 500.0 / max(h, w)
     small = cv2.resize(img_bgr, (max(1, int(w * scale)), max(1, int(h * scale))))
@@ -368,7 +357,6 @@ def warp_document(img_bgr, corners):
 
 
 def analyze_image_quality(img_bgr):
-    """Đo độ nét (Laplacian variance) và độ sáng trung bình."""
     small = fit_max(img_bgr, 800)
     gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
     blur_score = float(cv2.Laplacian(gray, cv2.CV_64F).var())
@@ -409,7 +397,6 @@ def smooth_illumination_correct(img_bgr):
 
 
 def apply_redactions(img, redactions):
-    """Vẽ các ô che thông tin nhạy cảm (tọa độ chuẩn hóa 0..1)."""
     if not redactions:
         return img
     h, w = img.shape[:2]
@@ -435,7 +422,6 @@ def apply_redactions(img, redactions):
 
 
 def extract_signature_rgba(raw_bgr):
-    """Tách nền chữ ký từ ảnh chụp trên giấy trắng -> ảnh BGRA trong suốt."""
     img = fit_max(raw_bgr, 900)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -459,7 +445,6 @@ def extract_signature_rgba(raw_bgr):
 
 
 def apply_signatures(img, signatures):
-    """Chèn các chữ ký BGRA vào trang."""
     if not signatures:
         return img
     h, w = img.shape[:2]
@@ -512,7 +497,6 @@ def _find_system_font():
 
 
 def apply_watermark(img, wm_text: str, wm_opacity: float = 0.22):
-    """Đóng dấu chữ mờ chéo trang."""
     text = (wm_text or "").strip()
     if not text:
         return img
@@ -619,7 +603,7 @@ DEFAULTS = {
     "blur_score": 120.0, "lum_score": 140.0, "is_blur": False, "is_dark": False,
 }
 
-_warp_cache = {}  # pid -> ảnh đã cắt (tối đa 3 trang trong RAM)
+_warp_cache = {}
 
 
 def get_warped(pg):
@@ -676,7 +660,6 @@ def render_page_with_overlay(src_bgr, pg, apply_overlays=True):
 
 
 def refresh_page_render(pg):
-    """Tạo lại ảnh nhỏ (thumb + view) từ bản xem nhanh 900px."""
     small = render_page_with_overlay(get_prev(pg), pg, apply_overlays=True)
     h, w = small.shape[:2]
     thumb = cv2.resize(small, (220, max(1, int(220 * h / w))), interpolation=cv2.INTER_AREA)
@@ -795,7 +778,7 @@ def new_doc_record(title, pages, folder="Chung"):
         "title": title,
         "folder": folder or "Chung",
         "date": time.strftime("%d/%m/%Y %H:%M"),
-        "selected": True,
+        "selected": False,
         "pages": pages,
         "undo": [],
     }
@@ -1009,7 +992,6 @@ def compose_pdf_page(img, dpi, paper):
 
 
 def build_pdf(items):
-    """items: list[(jpeg_bytes, w_px, h_px, dpi)] -> bytes PDF."""
     n = len(items)
     out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
     offsets = {}
@@ -1044,7 +1026,6 @@ def build_pdf(items):
 
 
 def build_pdf_with_target_mb(rendered_imgs, paper, base_dpi, base_q, max_mb=None):
-    """Nếu người dùng đặt giới hạn MB, tự động hạ dần DPI & JPEG Quality cho đến khi đạt."""
     if not max_mb or max_mb <= 0:
         items = []
         for im in rendered_imgs:
@@ -1098,7 +1079,6 @@ def export_pages(pages, name, fmt, quality, paper, max_mb=None):
 
 
 def compose_multi_grid_a4(imgs, layout=2, dpi=200):
-    """Ghép 2, 4 hoặc 6 ảnh vào 1 trang A4 dọc."""
     W, H = int(round(8.2677 * dpi)), int(round(11.693 * dpi))
     canvas = np.full((H, W, 3), 255, np.uint8)
     if layout <= 2:
@@ -1127,20 +1107,21 @@ def compose_multi_grid_a4(imgs, layout=2, dpi=200):
 
 
 # =====================================================================
-# 6. GIAO DIỆN CHÍNH (FLET UI)
+# 6. GIAO DIỆN ĐIỆN THOẠI (MOBILE-FIRST UI)
 # =====================================================================
 def main(page: ft.Page):
-    page.title = "CS Scanner Pro V6.2"
+    page.title = "CS Scanner Pro V6.3"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
-    page.bgcolor = "#F0F3F5"
+    page.bgcolor = "#EEF2F5"
+    # Kích thước khung chuẩn tỷ lệ màn hình điện thoại (20:9) khi mở trên máy tính
     try:
-        page.window.width = 515
-        page.window.height = 930
+        page.window.width = 430
+        page.window.height = 880
     except Exception:
         pass
 
-    CS_TEAL, CS_DARK, CS_ACCENT = "#00897B", "#1E272C", "#00BFA5"
+    CS_TEAL, CS_DARK, CS_ACCENT, CS_ORANGE = "#00897B", "#182026", "#00BFA5", "#E65100"
     WHITE = Colors.WHITE
 
     app_data = {
@@ -1148,6 +1129,7 @@ def main(page: ft.Page):
         "trash": [],
         "current_doc_idx": -1,
         "active_page_idx": 0,
+        "studio_tab": "color",  # color | crop | secure
         "crop_target_idx": -1,
         "crop_raw": None,
         "crop_disp": None,
@@ -1156,7 +1138,7 @@ def main(page: ft.Page):
         "sort_mode": "date_desc",
         "busy": False,
         "pending": None,
-        "picker_mode": "import_images",  # import_images | import_sig | restore_zip
+        "picker_mode": "import_images",
         "cam_running": False,
     }
     try:
@@ -1167,12 +1149,12 @@ def main(page: ft.Page):
         app_data["trash"] = []
 
     root_body = ft.Container(expand=True)
-    busy_bar = ft.ProgressBar(visible=False, color=CS_TEAL)
+    busy_bar = ft.ProgressBar(visible=False, color=CS_ACCENT, height=3)
 
     FILTER_OPTIONS = [
-        ("clear_orig", "🌟 Gốc Sáng Rõ"),
-        ("flat_light", "☀️ Khử Bóng Nền"),
-        ("crisp_gray", "📄 Chữ Đen Nét"),
+        ("clear_orig", "🌟 Sáng Rõ"),
+        ("flat_light", "☀️ Khử Bóng"),
+        ("crisp_gray", "📄 Chữ Nét"),
         ("bw_print", "⚫ Đen Trắng"),
         ("raw", "🖼️ Ảnh Gốc"),
     ]
@@ -1180,9 +1162,27 @@ def main(page: ft.Page):
     def cur_doc():
         return app_data["docs"][app_data["current_doc_idx"]]
 
+    # Helper tạo nút bấm dạng ô (Tile Button) chuẩn Mobile dễ bấm bằng ngón cái
+    def mobile_action_tile(icon_name, label, on_tap, bg="#F5F7F9", fg="#263238", icon_col=CS_TEAL, expand_tile=True):
+        return ft.Container(
+            expand=expand_tile,
+            bgcolor=bg,
+            padding=pad_sym(6, 8),
+            border_radius=10,
+            border=border_all(1, "#CFD8DC"),
+            alignment=ALIGN_CENTER,
+            on_click=on_tap,
+            content=ft.Column([
+                ft.Icon(icon_name, color=icon_col, size=22),
+                ft.Text(label, size=11, weight=ft.FontWeight.BOLD, color=fg,
+                        text_align=ft.TextAlign.CENTER, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+            ], spacing=3, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+        )
+
     # ---------- Thông báo / Hộp thoại ----------
     def toast(msg, color=CS_TEAL):
-        sb = ft.SnackBar(content=ft.Text(msg, color=WHITE, weight=ft.FontWeight.BOLD), bgcolor=color, duration=3200)
+        sb = ft.SnackBar(content=ft.Text(msg, color=WHITE, weight=ft.FontWeight.BOLD, size=13),
+                         bgcolor=color, duration=2800)
         if hasattr(page, "open"):
             try:
                 page.open(sb)
@@ -1222,7 +1222,7 @@ def main(page: ft.Page):
             close_dlg(dlg)
             on_yes()
         dlg = ft.AlertDialog(
-            modal=True, title=ft.Text(title), content=ft.Text(msg),
+            modal=True, title=ft.Text(title, size=16, weight=ft.FontWeight.BOLD), content=ft.Text(msg, size=13),
             actions=[ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
                      Btn(yes_label, bgcolor=Colors.RED_600, color=WHITE, on_click=yes)])
         open_dlg(dlg)
@@ -1233,7 +1233,7 @@ def main(page: ft.Page):
             if latest_wins:
                 app_data["pending"] = (work, done)
             else:
-                toast("⏳ Đang xử lý, vui lòng đợi một chút...", Colors.ORANGE_800)
+                toast("⏳ Đang xử lý, vui lòng đợi...", Colors.ORANGE_800)
             return
         app_data["busy"] = True
 
@@ -1267,7 +1267,6 @@ def main(page: ft.Page):
 
         threading.Thread(target=_t, daemon=True).start()
 
-    # ---------- Mở thư mục / Chia sẻ file sau khi xuất ----------
     def share_or_reveal_files(paths):
         if not paths:
             return
@@ -1275,11 +1274,11 @@ def main(page: ft.Page):
         if os.name == "nt" and os.path.exists(first_path):
             try:
                 os.system(f'explorer /select,"{os.path.normpath(first_path)}"')
-                toast(f"📂 Đã lưu & mở vị trí file: {first_path}", CS_TEAL)
+                toast(f"📂 Đã lưu & mở thư mục: {os.path.basename(first_path)}", CS_TEAL)
                 return
             except Exception:
                 pass
-        toast(f"✅ Đã lưu file tại: {first_path}", CS_TEAL)
+        toast(f"✅ Đã lưu tại: {first_path}", CS_TEAL)
 
     # ---------- Đổi tên & Đổi Thư mục ----------
     def rename_doc_dialog(doc_idx, after):
@@ -1287,7 +1286,7 @@ def main(page: ft.Page):
         tf_name = ft.TextField(value=doc["title"], label="Tên tài liệu", autofocus=True)
         existing_folders = sorted({d.get("folder", "Chung") or "Chung" for d in app_data["docs"]}
                                   | {"Chung", "Hồ sơ", "CCCD", "Hóa đơn", "Giáo án"})
-        tf_folder = ft.TextField(value=doc.get("folder", "Chung"), label="Thư mục (gõ tên mới hoặc chọn bên dưới)")
+        tf_folder = ft.TextField(value=doc.get("folder", "Chung"), label="Thư mục")
         folder_chips = ft.Row(
             scroll=ft.ScrollMode.AUTO,
             spacing=4,
@@ -1309,49 +1308,48 @@ def main(page: ft.Page):
             save_doc(doc)
             close_dlg(dlg)
             after()
-            toast(f"✏️ Đã lưu: {name} (Thư mục: {folder})")
+            toast(f"✏️ Đã lưu: {name}")
 
         tf_name.on_submit = save
         dlg = ft.AlertDialog(
-            modal=True, title=ft.Text("✏️ Đổi tên & Thư mục"),
+            modal=True, title=ft.Text("✏️ Đổi tên & Thư mục", size=16, weight=ft.FontWeight.BOLD),
             content=ft.Column([tf_name, tf_folder, folder_chips], tight=True, spacing=6),
             actions=[ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
                      Btn("Lưu", bgcolor=CS_TEAL, color=WHITE, on_click=save)])
         open_dlg(dlg)
 
-    # ---------- Xuất file (kèm Nén PDF theo dung lượng mục tiêu) ----------
+    # ---------- Xuất file (Nén PDF theo dung lượng MB) ----------
     def open_export_dialog(default_name, pages, fmt):
         pages = list(pages)
         if not pages:
             toast("⚠️ Không có trang nào để xuất!", Colors.ORANGE_800)
             return
         ext = ".pdf" if fmt == "pdf" else ".jpg"
-        tf = ft.TextField(value=default_name, label=f"Tên file (đuôi {ext})", autofocus=True, suffix_text=ext)
-        dd_q = ft.Dropdown(label="Chất lượng gốc", value="mid", options=[
-            DDOpt(key="low", text="Nhỏ gọn · 150 DPI (gửi Zalo/email)"),
+        tf = ft.TextField(value=default_name, label=f"Tên file ({ext})", autofocus=True, suffix_text=ext)
+        dd_q = ft.Dropdown(label="Chất lượng", value="mid", options=[
+            DDOpt(key="low", text="Nhỏ gọn · 150 DPI (Zalo/Email)"),
             DDOpt(key="mid", text="Cân bằng · 200 DPI"),
-            DDOpt(key="high", text="Cao · 300 DPI (in ấn)")])
+            DDOpt(key="high", text="Cao · 300 DPI (In rõ nét)")])
         dd_p = ft.Dropdown(label="Khổ giấy PDF", value="a4", options=[
-            DDOpt(key="a4", text="A4 chuẩn (căn giữa)"),
-            DDOpt(key="fit", text="Theo tỷ lệ ảnh gốc")])
+            DDOpt(key="a4", text="Khổ A4 chuẩn (Căn giữa)"),
+            DDOpt(key="fit", text="Vừa khít khung ảnh")])
         tf_mb = ft.TextField(
             value="",
-            label="Giới hạn dung lượng tối đa (MB) - Bỏ trống nếu không giới hạn",
-            hint_text="Ví dụ: 2 hoặc 5 (tự giảm chất lượng cho vừa)",
+            label="Nén dưới số MB (Bỏ trống = Không giới hạn)",
+            hint_text="VD: 2 hoặc 5",
             keyboard_type=ft.KeyboardType.NUMBER,
         )
         quick_mb_row = ft.Row([
-            ft.Text("Chọn nhanh:", size=11, color="#546E7A"),
-            ft.TextButton("Dưới 1 MB", on_click=lambda _: (setattr(tf_mb, "value", "1"), page.update())),
-            ft.TextButton("Dưới 2 MB", on_click=lambda _: (setattr(tf_mb, "value", "2"), page.update())),
-            ft.TextButton("Dưới 5 MB", on_click=lambda _: (setattr(tf_mb, "value", "5"), page.update())),
-            ft.TextButton("Không giới hạn", on_click=lambda _: (setattr(tf_mb, "value", ""), page.update())),
-        ], scroll=ft.ScrollMode.AUTO, spacing=2)
+            ft.TextButton("<= 1MB", on_click=lambda _: (setattr(tf_mb, "value", "1"), page.update())),
+            ft.TextButton("<= 2MB", on_click=lambda _: (setattr(tf_mb, "value", "2"), page.update())),
+            ft.TextButton("<= 5MB", on_click=lambda _: (setattr(tf_mb, "value", "5"), page.update())),
+            ft.TextButton("Tắt nén", on_click=lambda _: (setattr(tf_mb, "value", ""), page.update())),
+        ], scroll=ft.ScrollMode.AUTO, spacing=0)
 
         controls = [tf, dd_q]
         if fmt == "pdf":
             controls.extend([dd_p, tf_mb, quick_mb_row])
-        controls.append(ft.Text(f"Tổng số: {len(pages)} trang", size=11, color="#546E7A"))
+        controls.append(ft.Text(f"Tổng cộng: {len(pages)} trang", size=11, color="#546E7A"))
 
         def do(open_folder_after):
             name = (tf.value or "").strip()
@@ -1367,7 +1365,7 @@ def main(page: ft.Page):
                     if max_mb <= 0:
                         raise ValueError()
                 except ValueError:
-                    tf_mb.error_text = "Nhập số MB hợp lệ (VD: 2 hoặc 5)"
+                    tf_mb.error_text = "Nhập số MB hợp lệ"
                     page.update()
                     return
 
@@ -1379,36 +1377,34 @@ def main(page: ft.Page):
                 if open_folder_after:
                     share_or_reveal_files(paths)
                 else:
-                    extra = f" (+{len(paths) - 1} file)" if len(paths) > 1 else ""
-                    limit_txt = f" (Mục tiêu <= {max_mb} MB)" if max_mb else ""
-                    toast(f"✅ Đã lưu ({mb:.2f} MB{limit_txt}): {paths[0]}{extra}")
+                    toast(f"✅ Đã lưu ({mb:.2f} MB): {os.path.basename(paths[0])}")
 
             run_bg(lambda: export_pages(pages, name, fmt, q, paper, max_mb=max_mb), done)
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("📄 Xuất PDF (Có Nén Theo MB)" if fmt == "pdf" else "🖼️ Xuất ảnh JPG"),
-            content=ft.Column(controls, tight=True, spacing=8),
+            title=ft.Text("📄 Xuất file PDF" if fmt == "pdf" else "🖼️ Xuất ảnh JPG", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Column(controls, tight=True, spacing=6),
             actions=[ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
-                     OutBtn("💾 Chỉ Lưu", on_click=lambda _: do(False)),
-                     Btn("📂 Lưu & Mở Thư Mục", bgcolor=CS_TEAL, color=WHITE, on_click=lambda _: do(True))],
+                     OutBtn("💾 Lưu", on_click=lambda _: do(False)),
+                     Btn("📂 Lưu & Mở", bgcolor=CS_TEAL, color=WHITE, on_click=lambda _: do(True))],
             actions_alignment=ft.MainAxisAlignment.END)
         open_dlg(dlg)
 
-    def export_selected_docs_pdf(e):
+    def export_selected_docs_pdf(e=None):
         sel = [d for d in app_data["docs"] if d.get("selected")]
         if not sel:
-            toast("⚠️ Hãy tích chọn ít nhất 1 bộ tài liệu để xuất PDF!", Colors.ORANGE_800)
+            toast("⚠️ Hãy tích chọn ít nhất 1 tài liệu!", Colors.ORANGE_800)
             return
         pages = [pg for d in sel for pg in d["pages"]]
         default = sel[0]["title"] if len(sel) == 1 else f"Scan_{time.strftime('%Y%m%d_%H%M')}"
         open_export_dialog(default, pages, "pdf")
 
-    def export_current_doc_pdf(e):
+    def export_current_doc_pdf(e=None):
         d = cur_doc()
         open_export_dialog(d["title"], d["pages"], "pdf")
 
-    def export_current_doc_jpgs(e):
+    def export_current_doc_jpgs(e=None):
         d = cur_doc()
         open_export_dialog(d["title"], d["pages"], "jpg")
 
@@ -1417,26 +1413,26 @@ def main(page: ft.Page):
     # =================================================================
     def open_trash_dialog(e=None):
         app_data["trash"] = purge_and_load_trash()
-        trash_col = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO, height=340)
+        trash_col = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO, height=320)
 
         def rebuild_trash_list():
             trash_col.controls.clear()
             if not app_data["trash"]:
                 trash_col.controls.append(
-                    ft.Container(height=220, alignment=ALIGN_CENTER,
-                                 content=ft.Text("Thùng rác trống (Tự động xóa sau 7 ngày)", color="#78909C"))
+                    ft.Container(height=200, alignment=ALIGN_CENTER,
+                                 content=ft.Text("Thùng rác trống (Tự xóa sau 7 ngày)", color="#78909C", size=12))
                 )
             else:
                 for rec in list(app_data["trash"]):
-                    kind = "📁 Bộ tài liệu" if rec.get("type") == "doc" else "📄 Trang lẻ"
+                    kind = "📁 Bộ" if rec.get("type") == "doc" else "📄 Trang"
                     sub = f"{kind} • Còn {rec.get('days_left', 7)} ngày • {len(rec.get('page_ids', []))} trang"
                     trash_col.controls.append(ft.Card(content=ft.Container(padding=8, content=ft.Row([
                         ft.Column([
-                            ft.Text(rec.get("title", "Mục đã xóa"), weight=ft.FontWeight.BOLD, size=13),
-                            ft.Text(sub, size=11, color="#546E7A"),
+                            ft.Text(rec.get("title", "Mục đã xóa"), weight=ft.FontWeight.BOLD, size=12, max_lines=1),
+                            ft.Text(sub, size=10, color="#546E7A"),
                         ], expand=True, spacing=2),
-                        OutBtn("♻️ Khôi phục", on_click=lambda ev, r=rec: restore_item(r)),
-                        ft.IconButton(Icons.DELETE_FOREVER, icon_color=Colors.RED_700, tooltip="Xóa vĩnh viễn",
+                        OutBtn("♻️ Lấy lại", on_click=lambda ev, r=rec: restore_item(r)),
+                        ft.IconButton(Icons.DELETE_FOREVER, icon_color=Colors.RED_700,
                                       on_click=lambda ev, r=rec: kill_item(r)),
                     ]))))
             page.update()
@@ -1447,7 +1443,7 @@ def main(page: ft.Page):
                 delete_trash_item_permanently(rec)
                 app_data["trash"] = purge_and_load_trash()
                 rebuild_trash_list()
-                toast("⚠️ Không tìm thấy file ảnh gốc của mục này!", Colors.ORANGE_800)
+                toast("⚠️ Không tìm thấy file ảnh gốc!", Colors.ORANGE_800)
                 return
 
             if rec.get("type") == "doc":
@@ -1460,7 +1456,7 @@ def main(page: ft.Page):
                     "title": rec.get("title", "Tài liệu khôi phục"),
                     "folder": rec.get("folder", "Chung"),
                     "date": rec.get("date") or time.strftime("%d/%m/%Y %H:%M"),
-                    "selected": True,
+                    "selected": False,
                     "pages": pages,
                     "undo": [],
                 }
@@ -1484,7 +1480,7 @@ def main(page: ft.Page):
             app_data["trash"] = purge_and_load_trash()
             rebuild_trash_list()
             render_home_view()
-            toast("♻️ Đã khôi phục thành công!")
+            toast("♻️ Đã khôi phục!")
 
         def kill_item(rec):
             delete_trash_item_permanently(rec)
@@ -1503,10 +1499,10 @@ def main(page: ft.Page):
         rebuild_trash_list()
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text(f"🗑️ Thùng rác ({len(app_data['trash'])} mục - giữ 7 ngày)"),
-            content=ft.Container(width=420, content=trash_col),
+            title=ft.Text(f"🗑️ Thùng rác ({len(app_data['trash'])})", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Container(width=360, content=trash_col),
             actions=[
-                ft.TextButton("🔥 Dọn sạch tất cả", on_click=empty_all),
+                ft.TextButton("🔥 Xóa sạch", on_click=empty_all),
                 Btn("Đóng", bgcolor=CS_TEAL, color=WHITE, on_click=lambda _: close_dlg(dlg)),
             ],
         )
@@ -1515,10 +1511,7 @@ def main(page: ft.Page):
     def open_backup_dialog(e=None):
         def do_backup(_):
             close_dlg(dlg)
-            run_bg(
-                create_full_backup_zip,
-                lambda path: share_or_reveal_files([path]),
-            )
+            run_bg(create_full_backup_zip, lambda path: share_or_reveal_files([path]))
 
         def do_restore(_):
             close_dlg(dlg)
@@ -1527,30 +1520,27 @@ def main(page: ft.Page):
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("💾 Sao lưu & Khôi phục toàn bộ (.ZIP)"),
+            title=ft.Text("💾 Sao lưu & Khôi phục (.ZIP)", size=16, weight=ft.FontWeight.BOLD),
             content=ft.Column([
-                ft.Text("• Sao lưu: Đóng gói tất cả tài liệu, ảnh gốc, chữ ký và thư mục thành 1 file .ZIP duy nhất để cất vào Google Drive.", size=12),
-                ft.Text("• Khôi phục: Chọn file .ZIP đã sao lưu để lấy lại toàn bộ tài liệu khi cài lại app hoặc đổi máy.", size=12),
+                ft.Text("• Sao lưu: Xuất toàn bộ tài liệu, ảnh gốc, chữ ký ra 1 file .ZIP để lưu lên Drive.", size=12),
+                ft.Text("• Khôi phục: Nhập lại file .ZIP khi cài lại app hoặc đổi điện thoại/máy tính.", size=12),
             ], tight=True, spacing=8),
             actions=[
                 ft.TextButton("Đóng", on_click=lambda _: close_dlg(dlg)),
-                OutBtn("📥 Khôi phục từ .ZIP", on_click=do_restore),
-                Btn("📤 Xuất file .ZIP", bgcolor=CS_TEAL, color=WHITE, on_click=do_backup),
+                OutBtn("📥 Nhập .ZIP", on_click=do_restore),
+                Btn("📤 Xuất .ZIP", bgcolor=CS_TEAL, color=WHITE, on_click=do_backup),
             ],
         )
         open_dlg(dlg)
 
     # =================================================================
-    # MÀN HÌNH XEM TRƯỚC
+    # MÀN HÌNH XEM TRƯỚC TOÀN MÀN HÌNH (FULLSCREEN INSPECT)
     # =================================================================
     pv = {"idx": 0, "compare": False}
-    pv_holder = ft.Container(expand=True, bgcolor="#11171A", alignment=ALIGN_CENTER)
+    pv_holder = ft.Container(expand=True, bgcolor="#0D1214", alignment=ALIGN_CENTER)
     pv_img = make_img(fit=FIT.CONTAIN)
-    pv_title = ft.Text("", color=WHITE, size=13, weight=ft.FontWeight.BOLD, expand=True)
-    pv_chips = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=6)
-    pv_bright = ft.Slider(min=0, max=85, divisions=17, value=38, label="Độ sáng nền: {value}", active_color=CS_ACCENT)
-    pv_contrast = ft.Slider(min=0, max=85, divisions=17, value=35, label="Độ đậm chữ: {value}", active_color=CS_ACCENT)
-    pv_compare_btn = OutBtn("👁 So sánh với ảnh gốc")
+    pv_title = ft.Text("", color=WHITE, size=14, weight=ft.FontWeight.BOLD, expand=True)
+    pv_compare_btn = OutBtn("👁 Giữ/Bấm xem Ảnh Gốc")
 
     def render_preview_b64(pg, compare):
         warped = fit_max(get_warped(pg), 1500)
@@ -1565,22 +1555,9 @@ def main(page: ft.Page):
         pages = doc["pages"]
         pv["idx"] = max(0, min(pv["idx"], len(pages) - 1))
         pg = pages[pv["idx"]]
-        tag = "  [ẢNH GỐC]" if pv["compare"] else ""
-        warn = ""
-        if pg.get("is_blur"):
-            warn += " ⚠️Mờ"
-        if pg.get("is_dark"):
-            warn += " ⚠️Tối"
-        pv_title.value = f"Trang {pv['idx'] + 1}/{len(pages)}{warn}{tag}"
-        set_btn_text(
-            pv_compare_btn,
-            "👁 Đang xem: Gốc (bấm để xem bản đã chỉnh)" if pv["compare"] else "👁 So sánh với ảnh gốc"
-        )
-        pv_chips.controls.clear()
-        for code, label in FILTER_OPTIONS:
-            on = pg["filter"] == code
-            pv_chips.controls.append(Btn(label, bgcolor=CS_TEAL if on else "#37474F", color=WHITE,
-                                         on_click=lambda e, c=code: pv_adjust(new_filter=c)))
+        tag = " [GỐC]" if pv["compare"] else ""
+        pv_title.value = f"Trang {pv['idx'] + 1}/{len(pages)}{tag}"
+        set_btn_text(pv_compare_btn, "👁 Đang xem: Ảnh Gốc" if pv["compare"] else "👁 So sánh Ảnh Gốc")
         if reset_zoom or pv_holder.content is None:
             pv_holder.content = ft.InteractiveViewer(min_scale=1, max_scale=5, content=pv_img)
         page.update()
@@ -1595,72 +1572,34 @@ def main(page: ft.Page):
     def pv_goto(i):
         doc = cur_doc()
         pv["idx"] = max(0, min(i, len(doc["pages"]) - 1))
-        pg = doc["pages"][pv["idx"]]
-        pv_bright.value, pv_contrast.value = pg["bright"], pg["contrast"]
         pv["compare"] = False
         pv_render(reset_zoom=True)
-
-    def pv_adjust(new_filter=None):
-        doc = cur_doc()
-        pg = doc["pages"][pv["idx"]]
-        snapshot_doc(doc)
-        b, c = int(pv_bright.value), int(pv_contrast.value)
-        pv["compare"] = False
-
-        def work():
-            if new_filter is not None:
-                pg["filter"] = new_filter
-            pg["bright"], pg["contrast"] = b, c
-            refresh_page_render(pg)
-            save_page_meta(pg)
-            return render_preview_b64(pg, False)
-
-        def done(b64):
-            set_img(pv_img, b64)
-            pv_title.value = f"Trang {pv['idx'] + 1}/{len(doc['pages'])}"
-            pv_chips.controls.clear()
-            for code, label in FILTER_OPTIONS:
-                on = pg["filter"] == code
-                pv_chips.controls.append(Btn(label, bgcolor=CS_TEAL if on else "#37474F", color=WHITE,
-                                             on_click=lambda e, cc=code: pv_adjust(new_filter=cc)))
-            page.update()
-
-        run_bg(work, done, latest_wins=True)
-
-    def pv_toggle_compare(e):
-        pv["compare"] = not pv["compare"]
-        pv_render()
 
     def close_preview(e=None):
         app_data["active_page_idx"] = pv["idx"]
         open_doc_studio(app_data["current_doc_idx"], keep_page=True)
 
-    pv_bright.on_change_end = lambda e: pv_adjust()
-    pv_contrast.on_change_end = lambda e: pv_adjust()
-    pv_compare_btn.on_click = pv_toggle_compare
+    pv_compare_btn.on_click = lambda e: (pv.update({"compare": not pv["compare"]}), pv_render())
 
     def open_preview(p_idx):
         page.floating_action_button = None
         root_body.content = ft.Column([
-            ft.Container(bgcolor="#11171A", padding=pad_sym(6, 6), content=ft.Row([
+            ft.Container(bgcolor="#11171A", padding=pad_sym(8, 6), content=ft.Row([
                 ft.IconButton(Icons.ARROW_BACK, icon_color=WHITE, on_click=close_preview),
                 pv_title,
                 ft.IconButton(Icons.CHEVRON_LEFT, icon_color=WHITE, on_click=lambda _: pv_goto(pv["idx"] - 1)),
                 ft.IconButton(Icons.CHEVRON_RIGHT, icon_color=WHITE, on_click=lambda _: pv_goto(pv["idx"] + 1)),
             ])),
             pv_holder,
-            ft.Container(bgcolor="#1E272C", padding=10, content=ft.Column([
-                ft.Text("Cuộn chuột / Chụm 2 ngón để phóng to kiểm tra chữ", size=11, color="#B0BEC5"),
-                pv_chips,
-                ft.Text("☀️ Độ sáng nền", size=11, color=WHITE), pv_bright,
-                ft.Text("✒️ Độ đậm chữ", size=11, color=WHITE), pv_contrast,
+            ft.Container(bgcolor="#182026", padding=pad_sym(14, 10), content=ft.Row([
+                ft.Text("Chụm 2 ngón tay để phóng to kiểm tra chữ", size=11, color="#B0BEC5", expand=True),
                 pv_compare_btn,
-            ], spacing=2, tight=True)),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
         ], expand=True, spacing=0)
         pv_goto(p_idx)
 
     # =================================================================
-    # MÀN HÌNH 1: TRANG CHỦ
+    # MÀN HÌNH 1: TRANG CHỦ ĐIỆN THOẠI (BOTTOM ACTION BAR + CONTEXT BAR)
     # =================================================================
     docs_list_col = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
 
@@ -1670,7 +1609,7 @@ def main(page: ft.Page):
             save_doc(d)
         render_home_view()
 
-    def delete_selected_docs(e):
+    def delete_selected_docs(e=None):
         sel = [d for d in app_data["docs"] if d.get("selected")]
         if not sel:
             toast("⚠️ Chưa tích chọn tài liệu nào!", Colors.ORANGE_800)
@@ -1682,16 +1621,14 @@ def main(page: ft.Page):
             app_data["docs"] = [d for d in app_data["docs"] if not d.get("selected")]
             app_data["trash"] = purge_and_load_trash()
             render_home_view()
-            toast(f"🗑️ Đã chuyển {len(sel)} bộ tài liệu vào Thùng rác (giữ 7 ngày)!")
+            toast(f"🗑️ Đã chuyển {len(sel)} tài liệu vào Thùng rác!")
 
-        confirm_dlg("Chuyển vào Thùng rác?",
-                    f"Chuyển {len(sel)} bộ tài liệu vào Thùng rác? Bạn có thể khôi phục lại trong vòng 7 ngày.",
-                    go, yes_label="Chuyển vào Thùng rác")
+        confirm_dlg("Bỏ vào Thùng rác?", f"Chuyển {len(sel)} bộ tài liệu vào Thùng rác (giữ 7 ngày)?", go, "Xóa")
 
-    def merge_selected_docs(e):
+    def merge_selected_docs(e=None):
         sel = [d for d in app_data["docs"] if d.get("selected")]
         if len(sel) < 2:
-            toast("⚠️ Hãy tích chọn ít nhất 2 bộ tài liệu để gộp chung!", Colors.ORANGE_800)
+            toast("⚠️ Hãy tích chọn ít nhất 2 tài liệu để gộp!", Colors.ORANGE_800)
             return
         combined = [pg for d in sel for pg in d["pages"]]
         nd = new_doc_record("Tài liệu gộp", combined, folder=sel[0].get("folder", "Chung"))
@@ -1701,19 +1638,19 @@ def main(page: ft.Page):
         app_data["docs"].insert(0, nd)
         save_doc(nd)
         render_home_view()
-        toast(f"📑 Đã gộp thành 1 bộ gồm {len(combined)} trang!")
+        toast(f"📑 Đã gộp thành 1 bộ ({len(combined)} trang)!")
 
-    def open_batch_dialog():
+    def open_batch_dialog(e=None):
         sel = [d for d in app_data["docs"] if d.get("selected")]
         if not sel:
             toast("Hãy tích chọn ít nhất 1 tài liệu!", Colors.ORANGE_800)
             return
-        dd = ft.Dropdown(label="Bộ lọc áp dụng hàng loạt", value="clear_orig",
+        dd = ft.Dropdown(label="Bộ lọc màu", value="clear_orig",
                          options=[DDOpt(key=k, text=v) for k, v in FILTER_OPTIONS])
-        sb = ft.Slider(min=0, max=85, divisions=17, value=38, label="Độ sáng nền: {value}")
-        sc = ft.Slider(min=0, max=85, divisions=17, value=35, label="Độ đậm chữ: {value}")
+        sb = ft.Slider(min=0, max=85, divisions=17, value=38, label="Sáng nền: {value}")
+        sc = ft.Slider(min=0, max=85, divisions=17, value=35, label="Đậm chữ: {value}")
 
-        def apply(e):
+        def apply(_):
             f, b, c = dd.value or "clear_orig", int(sb.value), int(sc.value)
             close_dlg(dlg)
 
@@ -1727,17 +1664,17 @@ def main(page: ft.Page):
                         n += 1
                 return n
 
-            run_bg(work, lambda n: (render_home_view(), toast(f"✨ Đã chỉnh sáng & làm đậm cho {n} trang!")))
+            run_bg(work, lambda n: (render_home_view(), toast(f"✨ Đã làm sáng {n} trang!")))
 
         dlg = ft.AlertDialog(
-            modal=True, title=ft.Text("🎨 Chỉnh Sáng & Đậm Hàng Loạt"),
+            modal=True, title=ft.Text("🎨 Chỉnh Sáng Hàng Loạt", size=16, weight=ft.FontWeight.BOLD),
             content=ft.Column([
-                ft.Text("Áp dụng cho các bộ tài liệu đang tích chọn:", size=12), dd,
-                ft.Text("☀️ Tăng độ sáng (làm trắng nền giấy):", size=12, weight=ft.FontWeight.BOLD), sb,
-                ft.Text("✒️ Tăng độ đậm (làm đen nét chữ):", size=12, weight=ft.FontWeight.BOLD), sc,
-            ], tight=True, spacing=6),
+                dd,
+                ft.Text("☀️ Độ sáng nền giấy:", size=12, weight=ft.FontWeight.BOLD), sb,
+                ft.Text("✒️ Độ đậm nét chữ:", size=12, weight=ft.FontWeight.BOLD), sc,
+            ], tight=True, spacing=4),
             actions=[ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
-                     Btn("Áp dụng ngay ✓", bgcolor=CS_TEAL, color=WHITE, on_click=apply)])
+                     Btn("Áp dụng ✓", bgcolor=CS_TEAL, color=WHITE, on_click=apply)])
         open_dlg(dlg)
 
     def filtered_and_sorted_docs():
@@ -1767,14 +1704,7 @@ def main(page: ft.Page):
 
     def render_home_view():
         app_data["cam_running"] = False
-        try:
-            fab = ft.FloatingActionButton(icon=Icons.CAMERA_ALT, text="Quét / Tải Ảnh Mới",
-                                          bgcolor=CS_TEAL, on_click=lambda _: show_import_sheet(True))
-        except TypeError:
-            fab = ft.FloatingActionButton(icon=Icons.CAMERA_ALT,
-                                          content=ft.Text("Quét / Tải Ảnh Mới", color=WHITE),
-                                          bgcolor=CS_TEAL, on_click=lambda _: show_import_sheet(True))
-        page.floating_action_button = fab
+        page.floating_action_button = None
         docs_list_col.controls.clear()
         sel_count = sum(1 for d in app_data["docs"] if d.get("selected"))
         trash_count = len(app_data["trash"])
@@ -1787,80 +1717,171 @@ def main(page: ft.Page):
         for fd in all_folders:
             active = app_data["active_folder"] == fd
             folder_bar.controls.append(
-                Btn(f"📁 {fd}" if fd != "Tất cả" else "📚 Tất cả",
-                    bgcolor=CS_TEAL if active else "#DFE6E9",
-                    color=WHITE if active else "#263238",
-                    on_click=lambda e, f=fd: (app_data.update({"active_folder": f}), render_home_view()))
+                ft.Container(
+                    padding=pad_sym(12, 5),
+                    border_radius=16,
+                    bgcolor=CS_TEAL if active else "#E0E6EA",
+                    on_click=lambda e, f=fd: (app_data.update({"active_folder": f}), render_home_view()),
+                    content=ft.Text(
+                        f"📁 {fd}" if fd != "Tất cả" else f"📚 Tất cả ({len(app_data['docs'])})",
+                        size=12, weight=ft.FontWeight.BOLD,
+                        color=WHITE if active else "#37474F",
+                    ),
+                )
             )
 
         search_tf = ft.TextField(
             value=app_data["search_query"],
-            hint_text="🔍 Tìm tên tài liệu...",
-            height=40,
-            content_padding=pad_sym(10, 4),
+            hint_text="🔍 Tìm kiếm tài liệu...",
+            height=38,
+            text_size=13,
+            content_padding=pad_sym(12, 4),
+            border_radius=19,
+            bgcolor="#F5F7F9",
             expand=True,
             on_change=lambda e: (app_data.update({"search_query": e.control.value}), refresh_doc_cards_only()),
         )
 
         sort_menu = ft.PopupMenuButton(
             icon=Icons.SORT,
-            tooltip="Sắp xếp tài liệu",
+            tooltip="Sắp xếp",
             items=[
                 pm_item("🕒 Mới nhất trước", lambda _: (app_data.update({"sort_mode": "date_desc"}), render_home_view())),
                 pm_item("🕰️ Cũ nhất trước", lambda _: (app_data.update({"sort_mode": "date_asc"}), render_home_view())),
                 pm_item("🔤 Tên A → Z", lambda _: (app_data.update({"sort_mode": "name_asc"}), render_home_view())),
-                pm_item("📄 Số trang nhiều nhất", lambda _: (app_data.update({"sort_mode": "pages_desc"}), render_home_view())),
+                pm_item("📄 Nhiều trang nhất", lambda _: (app_data.update({"sort_mode": "pages_desc"}), render_home_view())),
             ],
+        )
+
+        # Thanh ngữ cảnh chỉ hiện khi người dùng tích chọn >= 1 tài liệu
+        selection_bar = ft.Container(
+            visible=(sel_count > 0),
+            bgcolor="#E0F2F1",
+            padding=pad_sym(10, 6),
+            content=ft.Row([
+                ft.Text(f"Đã chọn {sel_count}", size=12, weight=ft.FontWeight.BOLD, color=CS_TEAL),
+                ft.Row([
+                    ft.TextButton("Tất cả", on_click=lambda _: toggle_all_docs(True)),
+                    ft.TextButton("Bỏ", on_click=lambda _: toggle_all_docs(False)),
+                    ft.IconButton(Icons.AUTO_FIX_HIGH, icon_color=CS_TEAL, tooltip="Chỉnh sáng loạt", on_click=open_batch_dialog),
+                    ft.IconButton(Icons. CALL_MERGE, icon_color="#3949AB", tooltip="Gộp tài liệu", on_click=merge_selected_docs),
+                    ft.IconButton(Icons.PICTURE_AS_PDF, icon_color="#D84315", tooltip="Xuất PDF", on_click=export_selected_docs_pdf),
+                    ft.IconButton(Icons.DELETE_OUTLINE, icon_color=Colors.RED_600, tooltip="Xóa", on_click=delete_selected_docs),
+                ], spacing=0),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         )
 
         def refresh_doc_cards_only():
             docs_list_col.controls.clear()
             vis = filtered_and_sorted_docs()
             if not vis:
-                docs_list_col.controls.append(ft.Container(height=300, alignment=ALIGN_CENTER, content=ft.Column([
-                    ft.Icon(Icons.DOCUMENT_SCANNER_ROUNDED, size=70, color="#B0BEC5"),
-                    ft.Text("Chưa có tài liệu nào", size=16, weight=ft.FontWeight.BOLD, color="#546E7A"),
-                    ft.Text("Bấm '📸 Chụp Camera' hoặc 'Tải Ảnh' để bắt đầu quét tài liệu", size=12, color="#78909C"),
+                docs_list_col.controls.append(ft.Container(height=320, alignment=ALIGN_CENTER, content=ft.Column([
+                    ft.Icon(Icons.DOCUMENT_SCANNER_ROUNDED, size=68, color="#B0BEC5"),
+                    ft.Text("Chưa có tài liệu nào", size=15, weight=ft.FontWeight.BOLD, color="#546E7A"),
+                    ft.Text("Bấm nút '📸 Chụp Quét' hoặc '🖼️ Tải Ảnh' ở thanh dưới", size=12, color="#78909C"),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER)))
             else:
                 for idx, doc in vis:
                     thumb = doc["pages"][0]["thumb_b64"] if doc["pages"] else ""
                     warn_cnt = sum(1 for pg in doc["pages"] if pg.get("is_blur") or pg.get("is_dark"))
-                    warn_badge = f" • ⚠️ {warn_cnt} ảnh mờ/tối" if warn_cnt else ""
+                    warn_badge = f" • ⚠️ {warn_cnt} mờ/tối" if warn_cnt else ""
+                    is_sel = bool(doc.get("selected", False))
 
                     def on_chk(e, i=idx):
                         app_data["docs"][i]["selected"] = e.control.value
                         save_doc(app_data["docs"][i])
                         render_home_view()
 
-                    docs_list_col.controls.append(ft.Card(elevation=2, content=ft.Container(padding=6, content=ft.Row([
-                        ft.Checkbox(value=doc.get("selected", False), active_color=CS_TEAL, on_change=on_chk),
-                        ft.GestureDetector(on_tap=lambda e, i=idx: open_doc_studio(i), content=ft.Row([
-                            make_img(thumb, width=48, height=64, fit=FIT.COVER, border_radius=4),
-                            ft.Column([
-                                ft.Text(doc["title"], weight=ft.FontWeight.BOLD, size=14),
-                                ft.Text(f"📁 {doc.get('folder', 'Chung')} • 📅 {doc['date']} • 📄 {len(doc['pages'])} trang{warn_badge}",
-                                        size=11, color="#E65100" if warn_cnt else "#546E7A"),
-                            ], spacing=2)], spacing=10)),
-                        ft.Container(expand=True),
-                        ft.IconButton(Icons.DRIVE_FILE_RENAME_OUTLINE, icon_color="#546E7A", tooltip="Đổi tên & Thư mục",
-                                      on_click=lambda e, i=idx: rename_doc_dialog(i, render_home_view)),
-                        ft.IconButton(Icons.EDIT_DOCUMENT, icon_color=CS_TEAL, tooltip="Mở chỉnh sửa",
-                                      on_click=lambda e, i=idx: open_doc_studio(i)),
-                    ]))))
+                    docs_list_col.controls.append(
+                        ft.Container(
+                            bgcolor="#E8F5E9" if is_sel else WHITE,
+                            padding=pad_sym(8, 8),
+                            border_radius=12,
+                            border=border_all(1.5 if is_sel else 1, CS_TEAL if is_sel else "#E0E6EA"),
+                            content=ft.Row([
+                                ft.Checkbox(value=is_sel, active_color=CS_TEAL, on_change=on_chk),
+                                ft.GestureDetector(
+                                    on_tap=lambda e, i=idx: open_doc_studio(i),
+                                    content=make_img(thumb, width=50, height=66, fit=FIT.COVER, border_radius=6),
+                                ),
+                                ft.Container(
+                                    expand=True,
+                                    on_click=lambda e, i=idx: open_doc_studio(i),
+                                    content=ft.Column([
+                                        ft.Text(doc["title"], weight=ft.FontWeight.BOLD, size=14, max_lines=1,
+                                                overflow=ft.TextOverflow.ELLIPSIS),
+                                        ft.Row([
+                                            ft.Container(
+                                                padding=pad_sym(6, 2), border_radius=6, bgcolor="#ECEFF1",
+                                                content=ft.Text(f"📁 {doc.get('folder', 'Chung')}", size=10, color="#37474F"),
+                                            ),
+                                            ft.Text(f"📄 {len(doc['pages'])} trang{warn_badge}", size=11,
+                                                    color=CS_ORANGE if warn_cnt else "#546E7A", weight=ft.FontWeight.BOLD),
+                                        ], spacing=6),
+                                        ft.Text(f"🕒 {doc['date']}", size=10, color="#78909C"),
+                                    ], spacing=3),
+                                ),
+                                ft.PopupMenuButton(
+                                    icon=Icons.MORE_VERT,
+                                    icon_color="#546E7A",
+                                    items=[
+                                        pm_item("✏️ Đổi tên & Thư mục", lambda _, i=idx: rename_doc_dialog(i, render_home_view)),
+                                        pm_item("📄 Xuất nhanh PDF", lambda _, i=idx: open_export_dialog(app_data["docs"][i]["title"], app_data["docs"][i]["pages"], "pdf")),
+                                        pm_item("🖼️ Xuất ảnh JPG", lambda _, i=idx: open_export_dialog(app_data["docs"][i]["title"], app_data["docs"][i]["pages"], "jpg")),
+                                        pm_item("🗑️ Xóa vào Thùng rác", lambda _, i=idx: (
+                                            app_data["docs"][i].update({"selected": True}),
+                                            delete_selected_docs()
+                                        )),
+                                    ],
+                                ),
+                            ], spacing=6),
+                        )
+                    )
             page.update()
 
         refresh_doc_cards_only()
 
+        # Thanh nút bấm cố định dưới đáy màn hình điện thoại (Bottom Bar)
+        bottom_action_bar = ft.Container(
+            bgcolor=WHITE,
+            padding=pad_sym(12, 8),
+            border=border_all(1, "#CFD8DC"),
+            content=ft.Row([
+                ft.Container(
+                    expand=True,
+                    height=46,
+                    bgcolor=CS_ORANGE,
+                    border_radius=23,
+                    alignment=ALIGN_CENTER,
+                    on_click=lambda _: open_camera_screen(new_doc=True, auto_crop=True, mode="doc"),
+                    content=ft.Row([
+                        ft.Icon(Icons.PHOTO_CAMERA, color=WHITE, size=20),
+                        ft.Text("Chụp Quét", color=WHITE, weight=ft.FontWeight.BOLD, size=14),
+                    ], alignment=ft.MainAxisAlignment.CENTER, spacing=6),
+                ),
+                ft.Container(
+                    expand=True,
+                    height=46,
+                    bgcolor=CS_TEAL,
+                    border_radius=23,
+                    alignment=ALIGN_CENTER,
+                    on_click=lambda _: show_import_sheet(True),
+                    content=ft.Row([
+                        ft.Icon(Icons.ADD_PHOTO_ALTERNATE, color=WHITE, size=20),
+                        ft.Text("Tải Ảnh Lên", color=WHITE, weight=ft.FontWeight.BOLD, size=14),
+                    ], alignment=ft.MainAxisAlignment.CENTER, spacing=6),
+                ),
+            ], spacing=10),
+        )
+
         root_body.content = ft.Column([
-            ft.Container(bgcolor=CS_TEAL, padding=pad_sym(12, 10), content=ft.Row([
-                ft.Row([ft.Icon(Icons.DOCUMENT_SCANNER, color=WHITE, size=22),
-                        ft.Text("CS Scanner Pro V6.2", color=WHITE, size=17, weight=ft.FontWeight.BOLD)]),
+            # Header gọn gàng
+            ft.Container(bgcolor=CS_TEAL, padding=pad_sym(14, 10), content=ft.Row([
                 ft.Row([
-                    ft.Text(f"Chọn: {sel_count}/{len(app_data['docs'])}", color="#A7FFEB", size=11,
-                            weight=ft.FontWeight.BOLD),
-                    ft.IconButton(Icons.PHOTO_CAMERA, icon_color=WHITE, tooltip="Chụp trực tiếp từ Camera",
-                                  on_click=lambda _: open_camera_screen(new_doc=True, auto_crop=True, mode="doc")),
+                    ft.Icon(Icons.DOCUMENT_SCANNER, color=WHITE, size=22),
+                    ft.Text("CS Scanner", color=WHITE, size=18, weight=ft.FontWeight.BOLD),
+                ], spacing=8),
+                ft.Row([
                     ft.IconButton(Icons.BACKUP_OUTLINED, icon_color=WHITE, tooltip="Sao lưu & Khôi phục (.ZIP)",
                                   on_click=open_backup_dialog),
                     ft.IconButton(Icons.RESTORE_FROM_TRASH, icon_color="#FFE082" if trash_count else WHITE,
@@ -1868,39 +1889,39 @@ def main(page: ft.Page):
                 ], spacing=0),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
 
-            ft.Container(bgcolor=WHITE, padding=pad_sym(10, 6), content=ft.Column([
-                ft.Row([search_tf, sort_menu], spacing=4),
+            # Thanh tìm kiếm + Bộ lọc Thư mục
+            ft.Container(bgcolor=WHITE, padding=pad_sym(10, 8), content=ft.Column([
+                ft.Row([search_tf, sort_menu], spacing=2),
                 folder_bar,
-                ft.Row([
-                    Btn("📸 Chụp Camera", bgcolor="#D84315", color=WHITE,
-                        on_click=lambda _: open_camera_screen(new_doc=True, auto_crop=True, mode="doc")),
-                    ft.TextButton("☑️ Tất cả", on_click=lambda _: toggle_all_docs(True)),
-                    ft.TextButton("⬜ Bỏ chọn", on_click=lambda _: toggle_all_docs(False)),
-                    Btn("🎨 Chỉnh Sáng", bgcolor="#00695C", color=WHITE, on_click=lambda _: open_batch_dialog()),
-                    OutBtn("📑 Gộp", on_click=merge_selected_docs),
-                    OutBtn("📄 Xuất PDF", on_click=export_selected_docs_pdf),
-                    ft.IconButton(Icons.DELETE_OUTLINE, icon_color=Colors.RED_600, tooltip="Chuyển vào thùng rác",
-                                  on_click=delete_selected_docs),
-                ], scroll=ft.ScrollMode.AUTO, spacing=4),
-            ], spacing=6, tight=True)),
+            ], spacing=8, tight=True)),
 
-            ft.Container(padding=pad_sym(12, 4), expand=True, content=docs_list_col),
-        ], expand=True, spacing=4)
+            # Thanh thao tác hàng loạt (chỉ hiện khi có tích chọn)
+            selection_bar,
+
+            # Danh sách tài liệu ở giữa
+            ft.Container(padding=pad_sym(10, 4), expand=True, content=docs_list_col),
+
+            # Thanh tác vụ ngón cái dưới đáy
+            bottom_action_bar,
+        ], expand=True, spacing=0)
         page.update()
 
     # =================================================================
-    # MÀN HÌNH 2: STUDIO CHỈNH SỬA TRANG
+    # MÀN HÌNH 2: STUDIO ĐIỆN THOẠI (3 TẦNG CỐ ĐỊNH + BOTTOM DOCK 3 TAB)
     # =================================================================
-    big_preview_img = make_img(height=270, fit=FIT.CONTAIN)
-    page_strip_row = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=8)
-    selection_status_txt = ft.Text("", size=12, weight=ft.FontWeight.BOLD, color=CS_TEAL)
-    quality_alert_banner = ft.Container(visible=False, padding=6, border_radius=6, bgcolor="#FFF3E0")
-    bright_slider = ft.Slider(min=0, max=85, divisions=17, value=38, label="Độ sáng nền: {value}", active_color=CS_TEAL)
-    contrast_slider = ft.Slider(min=0, max=85, divisions=17, value=35, label="Độ đậm chữ: {value}", active_color=CS_TEAL)
-    sharp_slider = ft.Slider(min=0.0, max=2.5, divisions=10, value=1.0, label="Độ sắc nét: {value}", active_color=CS_TEAL)
+    big_preview_img = make_img(fit=FIT.CONTAIN, expand=True)
+    page_strip_row = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=6)
+    page_badge_txt = ft.Text("", size=11, weight=ft.FontWeight.BOLD, color=WHITE)
+    quality_alert_banner = ft.Container(visible=False, padding=pad_sym(10, 4), bgcolor="#FFF3E0")
+
+    bright_slider = ft.Slider(min=0, max=85, divisions=17, value=38, label="{value}", active_color=CS_TEAL, expand=True)
+    contrast_slider = ft.Slider(min=0, max=85, divisions=17, value=35, label="{value}", active_color=CS_TEAL, expand=True)
+    sharp_slider = ft.Slider(min=0.0, max=2.5, divisions=10, value=1.0, label="{value}", active_color=CS_TEAL, expand=True)
     filter_chips_row = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=6)
-    apply_all_switch = ft.Switch(label="Áp dụng cùng lúc cho tất cả trang đang tích chọn ☑️", value=True,
-                                 active_color=CS_TEAL)
+    apply_all_switch = ft.Switch(label="Áp dụng cho mọi trang đang tích ☑️", value=True, active_color=CS_TEAL)
+
+    studio_tab_body = ft.Container(padding=pad_sym(10, 8), bgcolor=WHITE)
+    tab_btn_row = ft.Row(spacing=4)
 
     def target_pages():
         doc = cur_doc()
@@ -1948,8 +1969,7 @@ def main(page: ft.Page):
                 save_page_meta(pg)
 
         run_bg(work, lambda _: (refresh_studio_ui(),
-                                toast("🎯 Đã tự động canh chỉnh vào trang giấy!" if use_ai
-                                      else "🖼️ Đã khôi phục toàn bộ khung ảnh gốc!")))
+                                toast("🎯 Đã tự động cắt nền bàn!" if use_ai else "🖼️ Đã lấy lại toàn bộ ảnh gốc!")))
 
     bright_slider.on_change_end = lambda e: apply_adjustment_to_targets()
     contrast_slider.on_change_end = lambda e: apply_adjustment_to_targets()
@@ -2002,13 +2022,12 @@ def main(page: ft.Page):
         app_data["active_page_idx"] = [pg["id"] for pg in doc["pages"]].index(cur_id)
         save_doc(doc)
         refresh_studio_ui()
-        toast("🔤 Đã sắp xếp theo tên file gốc" if mode == "name" else "🔃 Đã đảo ngược thứ tự")
+        toast("🔤 Đã xếp theo tên gốc" if mode == "name" else "🔃 Đã đảo thứ tự trang")
 
     def move_to_dialog(e=None):
         doc = cur_doc()
         n = len(doc["pages"])
-        tf = ft.TextField(label=f"Vị trí mới (từ 1 đến {n})", keyboard_type=ft.KeyboardType.NUMBER,
-                          autofocus=True)
+        tf = ft.TextField(label=f"Chuyển tới vị trí (1 - {n})", keyboard_type=ft.KeyboardType.NUMBER, autofocus=True)
 
         def go(ev):
             try:
@@ -2016,7 +2035,7 @@ def main(page: ft.Page):
             except ValueError:
                 j = 0
             if not 1 <= j <= n:
-                tf.error_text = f"Nhập số từ 1 đến {n}"
+                tf.error_text = f"Nhập từ 1 đến {n}"
                 page.update()
                 return
             snapshot_doc(doc)
@@ -2029,7 +2048,7 @@ def main(page: ft.Page):
 
         tf.on_submit = go
         dlg = ft.AlertDialog(
-            modal=True, title=ft.Text("↔ Chuyển trang đang xem tới vị trí"), content=tf,
+            modal=True, title=ft.Text("↔ Đổi vị trí trang", size=16, weight=ft.FontWeight.BOLD), content=tf,
             actions=[ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
                      Btn("Chuyển", bgcolor=CS_TEAL, color=WHITE, on_click=go)])
         open_dlg(dlg)
@@ -2037,13 +2056,13 @@ def main(page: ft.Page):
     def undo_last(e=None):
         doc = cur_doc()
         if not doc["undo"]:
-            toast("Không còn thao tác nào để hoàn tác", Colors.ORANGE_800)
+            toast("Không còn bước nào để hoàn tác", Colors.ORANGE_800)
             return
         snap = doc["undo"].pop()
         run_bg(lambda: restore_snapshot(doc, snap),
                lambda _: (select_active_page(app_data["active_page_idx"]), toast("↩️ Đã hoàn tác")))
 
-    def delete_selected_pages(e):
+    def delete_selected_pages(e=None):
         doc = cur_doc()
         sel = [pg for pg in doc["pages"] if pg.get("selected")]
         removed = sel if sel else ([doc["pages"][app_data["active_page_idx"]]] if doc["pages"] else [])
@@ -2060,28 +2079,26 @@ def main(page: ft.Page):
                 delete_doc_json(doc)
                 app_data["docs"].pop(app_data["current_doc_idx"])
                 render_home_view()
-                toast(f"🗑️ Đã chuyển {len(removed)} trang vào Thùng rác!")
+                toast(f"🗑️ Đã xóa {len(removed)} trang vào Thùng rác!")
                 return
             save_doc(doc)
             select_active_page(min(app_data["active_page_idx"], len(doc["pages"]) - 1))
-            toast(f"🗑️ Đã chuyển {len(removed)} trang vào Thùng rác (giữ 7 ngày)!")
+            toast(f"🗑️ Đã chuyển {len(removed)} trang vào Thùng rác!")
 
-        confirm_dlg("Chuyển trang vào Thùng rác?",
-                    f"Chuyển {len(removed)} trang vào Thùng rác (có thể khôi phục trong 7 ngày)?",
-                    go, yes_label="Chuyển vào Thùng rác")
+        confirm_dlg("Xóa trang?", f"Chuyển {len(removed)} trang vào Thùng rác (giữ 7 ngày)?", go, "Xóa")
 
     # ---------- Ghép 2 / 4 / 6 trang vào 1 trang A4 ----------
     def open_multi_grid_dialog(e=None):
         doc = cur_doc()
         sel = [pg for pg in doc["pages"] if pg.get("selected")]
         if len(sel) < 2:
-            toast("🪪 Hãy tích chọn từ 2 đến 6 trang để ghép vào 1 mặt A4!", Colors.ORANGE_800)
+            toast("🪪 Hãy tích chọn từ 2 đến 6 trang ở dải bên dưới để ghép!", Colors.ORANGE_800)
             return
         default_layout = "2" if len(sel) == 2 else ("4" if len(sel) <= 4 else "6")
-        dd_layout = ft.Dropdown(label="Bố cục ghép trên 1 trang A4 dọc", value=default_layout, options=[
-            DDOpt(key="2", text="2 ảnh / trang A4 (1x2 - Ghép CCCD 2 mặt)"),
-            DDOpt(key="4", text="4 ảnh / trang A4 (Lưới 2x2)"),
-            DDOpt(key="6", text="6 ảnh / trang A4 (Lưới 3x2)"),
+        dd_layout = ft.Dropdown(label="Kiểu ghép trên 1 mặt A4", value=default_layout, options=[
+            DDOpt(key="2", text="2 mặt / A4 (Ghép CCCD, Bằng lái)"),
+            DDOpt(key="4", text="4 trang / A4 (Lưới 2x2)"),
+            DDOpt(key="6", text="6 trang / A4 (Lưới 3x2)"),
         ])
 
         def do_merge(_):
@@ -2112,11 +2129,8 @@ def main(page: ft.Page):
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text(f"🪪 Ghép nhiều trang vào 1 mặt A4 (Đang chọn {len(sel)} trang)"),
-            content=ft.Column([
-                ft.Text("Chọn số lượng khung ảnh trên 1 tờ A4:", size=12),
-                dd_layout,
-            ], tight=True, spacing=8),
+            title=ft.Text(f"🪪 Ghép vào 1 trang A4 ({len(sel)} trang)", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Column([dd_layout], tight=True, spacing=8),
             actions=[
                 ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
                 Btn("Ghép ngay ✓", bgcolor=CS_TEAL, color=WHITE, on_click=do_merge),
@@ -2129,10 +2143,10 @@ def main(page: ft.Page):
         doc = cur_doc()
         cur = doc["pages"][app_data["active_page_idx"]]
         default_wm = cur.get("watermark", "") or f"Bản sao chỉ dùng nộp hồ sơ ngày {time.strftime('%d/%m/%Y')}"
-        tf_wm = ft.TextField(value=default_wm, label="Nội dung chữ đóng dấu mờ", autofocus=True)
+        tf_wm = ft.TextField(value=default_wm, label="Nội dung đóng dấu mờ", autofocus=True)
         sl_op = ft.Slider(min=0.08, max=0.55, divisions=9, value=float(cur.get("wm_opacity", 0.22)),
-                          label="Độ đậm chữ mờ: {value}")
-        sw_all = ft.Switch(label="Áp dụng cho tất cả trang đang tích chọn ☑️", value=True, active_color=CS_TEAL)
+                          label="Độ đậm: {value}")
+        sw_all = ft.Switch(label="Áp dụng mọi trang đang tích ☑️", value=True, active_color=CS_TEAL)
 
         def apply_wm(clear=False):
             txt = "" if clear else (tf_wm.value or "").strip()
@@ -2151,26 +2165,98 @@ def main(page: ft.Page):
                     save_page_meta(pg)
 
             run_bg(work, lambda _: (refresh_studio_ui(),
-                                    toast("🚫 Đã gỡ chữ đóng dấu!" if clear else "🔖 Đã đóng dấu chữ mờ lên trang!")))
+                                    toast("🚫 Đã gỡ dấu mờ!" if clear else "🔖 Đã đóng dấu chữ mờ!")))
 
-        pil_note = "✅ Đã có Pillow: Hiển thị đầy đủ tiếng Việt có dấu." if HAS_PIL else "ℹ️ Chưa cài Pillow: Tự động chuyển sang chữ không dấu."
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("🔖 Đóng dấu chữ mờ bảo vệ (Watermark)"),
-            content=ft.Column([
-                tf_wm,
-                ft.Text("Độ đậm nhạt của chữ đóng dấu:", size=12),
-                sl_op,
-                sw_all,
-                ft.Text(pil_note, size=11, color="#546E7A"),
-            ], tight=True, spacing=6),
+            title=ft.Text("🔖 Đóng dấu chữ mờ (Watermark)", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Column([tf_wm, ft.Text("Độ đậm chữ mờ:", size=12), sl_op, sw_all], tight=True, spacing=4),
             actions=[
                 ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
-                OutBtn("Xóa dấu mờ", on_click=lambda _: apply_wm(clear=True)),
+                OutBtn("Gỡ dấu", on_click=lambda _: apply_wm(clear=True)),
                 Btn("Đóng dấu ✓", bgcolor=CS_TEAL, color=WHITE, on_click=lambda _: apply_wm(clear=False)),
             ],
         )
         open_dlg(dlg)
+
+    def build_studio_tab_content():
+        t_mode = app_data.get("studio_tab", "color")
+        tab_btn_row.controls.clear()
+        tabs_meta = [
+            ("color", Icons.PALETTE_OUTLINED, "Màu & Sáng"),
+            ("crop", Icons.CROP_ROTATE, "Cắt & Xoay"),
+            ("secure", Icons.VERIFIED_USER_OUTLINED, "Bảo mật & Ghép"),
+        ]
+        for code, ic, lb in tabs_meta:
+            active = (t_mode == code)
+            tab_btn_row.controls.append(
+                ft.Container(
+                    expand=True,
+                    padding=pad_sym(6, 7),
+                    border_radius=8,
+                    bgcolor=CS_TEAL if active else "#ECEFF1",
+                    alignment=ALIGN_CENTER,
+                    on_click=lambda e, c=code: (app_data.update({"studio_tab": c}), build_studio_tab_content(), page.update()),
+                    content=ft.Row([
+                        ft.Icon(ic, size=16, color=WHITE if active else "#455A64"),
+                        ft.Text(lb, size=12, weight=ft.FontWeight.BOLD, color=WHITE if active else "#455A64"),
+                    ], alignment=ft.MainAxisAlignment.CENTER, spacing=4),
+                )
+            )
+
+        if t_mode == "color":
+            studio_tab_body.content = ft.Column([
+                filter_chips_row,
+                ft.Row([
+                    ft.Text("☀️ Sáng nền", size=11, weight=ft.FontWeight.BOLD, width=78),
+                    bright_slider,
+                ], spacing=4),
+                ft.Row([
+                    ft.Text("✒️ Đậm chữ", size=11, weight=ft.FontWeight.BOLD, width=78),
+                    contrast_slider,
+                ], spacing=4),
+                ft.Row([
+                    ft.Text("✨ Sắc nét", size=11, weight=ft.FontWeight.BOLD, width=78),
+                    sharp_slider,
+                ], spacing=4),
+                apply_all_switch,
+            ], spacing=2, tight=True)
+
+        elif t_mode == "crop":
+            studio_tab_body.content = ft.Column([
+                ft.Row([
+                    mobile_action_tile(Icons.CROP, "Kéo 4 Góc", lambda _: open_crop_screen(app_data["active_page_idx"]),
+                                       bg="#FFF3E0", icon_col=CS_ORANGE),
+                    mobile_action_tile(Icons.CROP_FREE, "AI Tự Cắt", lambda _: batch_auto_crop_targets(True)),
+                    mobile_action_tile(Icons.ROTATE_RIGHT, "Xoay 90°", lambda _: apply_adjustment_to_targets(rotate_delta=90)),
+                    mobile_action_tile(Icons.FULLSCREEN, "Khung Gốc", lambda _: batch_auto_crop_targets(False)),
+                ], spacing=6),
+                ft.Row([
+                    mobile_action_tile(Icons.ARROW_BACK, "Dời Trái", lambda _: move_active_page(-1), icon_col="#3949AB"),
+                    mobile_action_tile(Icons.ARROW_FORWARD, "Dời Phải", lambda _: move_active_page(1), icon_col="#3949AB"),
+                    mobile_action_tile(Icons.SWAP_VERT, "Đổi Vị Trí", move_to_dialog, icon_col="#3949AB"),
+                    mobile_action_tile(Icons.DELETE_OUTLINE, "Xóa Trang", delete_selected_pages,
+                                       bg="#FFEBEE", icon_col=Colors.RED_600),
+                ], spacing=6),
+            ], spacing=6, tight=True)
+
+        else:  # secure
+            studio_tab_body.content = ft.Column([
+                ft.Row([
+                    mobile_action_tile(Icons.VISIBILITY_OFF, "Che CCCD/TK",
+                                       lambda _: open_redact_screen(app_data["active_page_idx"]),
+                                       bg="#ECEFF1", icon_col="#263238"),
+                    mobile_action_tile(Icons.DRAW, "Chèn Chữ Ký",
+                                       lambda _: open_signature_screen(app_data["active_page_idx"]),
+                                       bg="#E8EAF6", icon_col="#283593"),
+                ], spacing=8),
+                ft.Row([
+                    mobile_action_tile(Icons.BRANDING_WATERMARK, "Đóng Dấu Mờ",
+                                       open_watermark_dialog, bg="#FCE4EC", icon_col="#AD1457"),
+                    mobile_action_tile(Icons.GRID_VIEW_ROUNDED, "Ghép 2/4/6 A4",
+                                       open_multi_grid_dialog, bg="#E0F2F1", icon_col=CS_TEAL),
+                ], spacing=8),
+            ], spacing=6, tight=True)
 
     def refresh_studio_ui():
         doc = cur_doc()
@@ -2186,48 +2272,59 @@ def main(page: ft.Page):
         except Exception:
             pass
         sel_cnt = sum(1 for pg in doc["pages"] if pg.get("selected"))
-        selection_status_txt.value = (f"Trang {p_idx + 1}/{len(doc['pages'])}  •  Đang tích: {sel_cnt} trang"
-                                      f"  •  Hoàn tác: {len(doc['undo'])}")
+        page_badge_txt.value = f"Trang {p_idx + 1}/{len(doc['pages'])} • Chọn: {sel_cnt}"
 
         warns = []
         if cur.get("is_blur"):
-            warns.append(f"Ảnh có dấu hiệu bị mờ (độ nét {cur.get('blur_score', 0)})")
+            warns.append("Ảnh hơi mờ")
         if cur.get("is_dark"):
-            warns.append(f"Ảnh hơi tối (độ sáng {cur.get('lum_score', 0)})")
+            warns.append("Ảnh thiếu sáng")
         if warns:
             quality_alert_banner.visible = True
             quality_alert_banner.content = ft.Row([
-                ft.Icon(Icons.WARNING_AMBER_ROUNDED, color="#E65100", size=18),
-                ft.Text(" • ".join(warns) + " — Hãy kiểm tra kỹ hoặc chụp lại!", size=11, color="#E65100",
+                ft.Icon(Icons.WARNING_AMBER_ROUNDED, color=CS_ORANGE, size=16),
+                ft.Text(" & ".join(warns) + " — Bấm '🔍 Xem rõ' để kiểm tra!", size=11, color=CS_ORANGE,
                         weight=ft.FontWeight.BOLD, expand=True),
-            ], spacing=6)
+            ], spacing=4)
         else:
             quality_alert_banner.visible = False
 
         filter_chips_row.controls.clear()
         for code, label in FILTER_OPTIONS:
             on = cur["filter"] == code
-            filter_chips_row.controls.append(Btn(
-                label, bgcolor=CS_TEAL if on else "#CFD8DC", color=WHITE if on else "#263238",
-                on_click=lambda e, c=code: apply_adjustment_to_targets(new_filter=c)))
+            filter_chips_row.controls.append(
+                ft.Container(
+                    padding=pad_sym(10, 6),
+                    border_radius=14,
+                    bgcolor=CS_TEAL if on else "#E0E6EA",
+                    on_click=lambda e, c=code: apply_adjustment_to_targets(new_filter=c),
+                    content=ft.Text(label, size=11, weight=ft.FontWeight.BOLD, color=WHITE if on else "#263238"),
+                )
+            )
+
         page_strip_row.controls.clear()
         for i, pg in enumerate(doc["pages"]):
             viewing = i == p_idx
             bad = pg.get("is_blur") or pg.get("is_dark")
-            badge_txt = f"#{i + 1}⚠️" if bad else f"#{i + 1}"
+            badge_txt = f"{i + 1}⚠️" if bad else f"{i + 1}"
             page_strip_row.controls.append(ft.Container(
-                width=98, padding=4, border_radius=8,
-                bgcolor="#FFF3E0" if bad and not viewing else ("#E0F2F1" if viewing else WHITE),
-                border=border_all(3 if viewing else 1, CS_TEAL if viewing else ("#FB8C00" if bad else "#B0BEC5")),
+                width=68, padding=3, border_radius=8,
+                bgcolor="#FFF3E0" if bad and not viewing else ("#E0F2F1" if viewing else "#F5F7F9"),
+                border=border_all(2.5 if viewing else 1, CS_TEAL if viewing else ("#FB8C00" if bad else "#CFD8DC")),
                 content=ft.Column([
-                    ft.Row([ft.Checkbox(value=pg.get("selected", False), active_color=CS_TEAL,
-                                        on_change=lambda e, idx=i: toggle_page_checkbox(idx, e.control.value)),
-                            ft.Text(badge_txt, size=11, weight=ft.FontWeight.BOLD,
-                                    color="#E65100" if bad else "#263238")],
-                           spacing=0, alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.GestureDetector(on_tap=lambda e, idx=i: select_active_page(idx),
-                                       content=make_img(pg["thumb_b64"], width=78, height=85, fit=FIT.COVER)),
-                ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)))
+                    ft.GestureDetector(
+                        on_tap=lambda e, idx=i: select_active_page(idx),
+                        content=make_img(pg["thumb_b64"], width=58, height=64, fit=FIT.COVER, border_radius=4),
+                    ),
+                    ft.Row([
+                        ft.Checkbox(value=pg.get("selected", False), active_color=CS_TEAL,
+                                    on_change=lambda e, idx=i: toggle_page_checkbox(idx, e.control.value)),
+                        ft.Text(badge_txt, size=10, weight=ft.FontWeight.BOLD,
+                                color=CS_ORANGE if bad else "#263238"),
+                    ], spacing=0, alignment=ft.MainAxisAlignment.CENTER),
+                ], spacing=0, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            ))
+        build_studio_tab_content()
         page.update()
 
     def open_doc_studio(doc_idx, keep_page=False):
@@ -2243,100 +2340,120 @@ def main(page: ft.Page):
             bright_slider.value, contrast_slider.value, sharp_slider.value = cur["bright"], cur["contrast"], cur["sharp"]
         refresh_studio_ui()
 
-        tools = ft.Row([
-            Btn("📐 4 Góc", bgcolor="#FFF3E0", color="#E65100",
-                on_click=lambda _: open_crop_screen(app_data["active_page_idx"])),
-            Btn("⬛ Che thông tin", bgcolor="#ECEFF1", color="#263238",
-                on_click=lambda _: open_redact_screen(app_data["active_page_idx"])),
-            Btn("✍️ Chữ ký", bgcolor="#E8EAF6", color="#283593",
-                on_click=lambda _: open_signature_screen(app_data["active_page_idx"])),
-            Btn("🔖 Đóng dấu mờ", bgcolor="#FCE4EC", color="#AD1457",
-                on_click=open_watermark_dialog),
-            ft.IconButton(Icons.CROP_FREE, tooltip="AI tự cắt bỏ nền bàn", icon_color=CS_TEAL,
-                          on_click=lambda _: batch_auto_crop_targets(True)),
-            ft.IconButton(Icons.FULLSCREEN, tooltip="Khôi phục khung ảnh gốc",
-                          on_click=lambda _: batch_auto_crop_targets(False)),
-            ft.IconButton(Icons.ROTATE_RIGHT, tooltip="Xoay 90°",
-                          on_click=lambda _: apply_adjustment_to_targets(rotate_delta=90)),
-            ft.IconButton(Icons.UNDO, tooltip="Hoàn tác", icon_color="#3949AB", on_click=undo_last),
-            ft.IconButton(Icons.ARROW_CIRCLE_LEFT_OUTLINED, tooltip="Dời trang sang trái",
-                          on_click=lambda _: move_active_page(-1)),
-            ft.IconButton(Icons.ARROW_CIRCLE_RIGHT_OUTLINED, tooltip="Dời trang sang phải",
-                          on_click=lambda _: move_active_page(1)),
-            ft.PopupMenuButton(icon=Icons.SORT, icon_color="#3949AB", tooltip="Sắp xếp trang", items=[
-                pm_item("↔ Chuyển trang này tới vị trí số...", move_to_dialog),
-                pm_item("🔤 Sắp xếp theo tên file gốc", lambda _: sort_pages("name")),
-                pm_item("🔃 Đảo ngược toàn bộ thứ tự", lambda _: sort_pages("reverse")),
-            ]),
-            ft.IconButton(Icons.DELETE_OUTLINE, icon_color=Colors.RED_600, tooltip="Xóa trang (vào thùng rác)",
-                          on_click=delete_selected_pages),
-        ], scroll=ft.ScrollMode.AUTO, spacing=4)
-
-        root_body.content = ft.Column(scroll=ft.ScrollMode.ADAPTIVE, expand=True, spacing=6, controls=[
-            ft.Container(bgcolor=CS_TEAL, padding=pad_sym(8, 8), content=ft.Row([
+        root_body.content = ft.Column(expand=True, spacing=0, controls=[
+            # 1. Thanh tiêu đề Studio
+            ft.Container(bgcolor=CS_TEAL, padding=pad_sym(6, 6), content=ft.Row([
                 ft.IconButton(Icons.ARROW_BACK, icon_color=WHITE, on_click=lambda _: render_home_view()),
-                ft.Text(f"{doc['title']} ({doc.get('folder', 'Chung')})", color=WHITE, size=14,
-                        weight=ft.FontWeight.BOLD, expand=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
-                ft.IconButton(Icons.DRIVE_FILE_RENAME_OUTLINE, icon_color=WHITE, tooltip="Đổi tên & Thư mục",
-                              on_click=lambda _: rename_doc_dialog(
-                                  app_data["current_doc_idx"],
-                                  lambda: open_doc_studio(app_data["current_doc_idx"], keep_page=True))),
-                ft.IconButton(Icons.PICTURE_AS_PDF, icon_color=WHITE, tooltip="Xuất PDF",
-                              on_click=export_current_doc_pdf),
-                ft.PopupMenuButton(icon=Icons.MORE_VERT, icon_color=WHITE, items=[
-                    pm_item("📄 Xuất PDF (Có nén theo MB)...", export_current_doc_pdf),
-                    pm_item("🖼️ Xuất ảnh JPG...", export_current_doc_jpgs),
-                ]),
-            ], spacing=0)),
-
-            ft.Container(margin=mar_sym(10, 0), padding=8, bgcolor=WHITE, border_radius=10, content=ft.Column([
-                selection_status_txt,
-                quality_alert_banner,
-                tools,
-                ft.GestureDetector(on_tap=lambda _: open_preview(app_data["active_page_idx"]),
-                                   content=ft.Container(alignment=ALIGN_CENTER, content=big_preview_img)),
-                Btn("🔍 Xem trước toàn màn hình (kiểm tra dễ đọc)", bgcolor="#263238", color=WHITE,
-                    on_click=lambda _: open_preview(app_data["active_page_idx"])),
-            ], spacing=4)),
-
-            ft.Container(margin=mar_sym(10, 0), padding=8, bgcolor=WHITE, border_radius=10, content=ft.Column([
-                ft.Row([
-                    ft.Row([ft.TextButton("☑️ Chọn hết", on_click=lambda _: set_all_pages_checkbox(True)),
-                            ft.TextButton("⬜ Bỏ chọn", on_click=lambda _: set_all_pages_checkbox(False))],
-                           spacing=0),
-                    ft.Row([
-                        Btn("📸 Chụp Thêm", bgcolor="#D84315", color=WHITE,
-                            on_click=lambda _: open_camera_screen(new_doc=False, auto_crop=True, mode="doc")),
-                        Btn("➕ Tải Ảnh", bgcolor=CS_TEAL, color=WHITE,
-                            on_click=lambda _: show_import_sheet(False)),
+                ft.Container(
+                    expand=True,
+                    on_click=lambda _: rename_doc_dialog(
+                        app_data["current_doc_idx"],
+                        lambda: open_doc_studio(app_data["current_doc_idx"], keep_page=True),
+                    ),
+                    content=ft.Column([
+                        ft.Text(doc["title"], color=WHITE, size=14, weight=ft.FontWeight.BOLD,
+                                max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                        ft.Text(f"📁 {doc.get('folder', 'Chung')} (Chạm để đổi tên)", color="#A7FFEB", size=10),
+                    ], spacing=0),
+                ),
+                ft.Container(
+                    bgcolor="#D84315", padding=pad_sym(10, 6), border_radius=16,
+                    on_click=export_current_doc_pdf,
+                    content=ft.Row([
+                        ft.Icon(Icons.PICTURE_AS_PDF, color=WHITE, size=16),
+                        ft.Text("Xuất PDF", color=WHITE, size=12, weight=ft.FontWeight.BOLD),
                     ], spacing=4),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                OutBtn("🪪 Ghép 2 / 4 / 6 trang vào 1 mặt A4 (CCCD, thẻ, hóa đơn...)", on_click=open_multi_grid_dialog),
-                page_strip_row,
+                ),
+                ft.PopupMenuButton(icon=Icons.MORE_VERT, icon_color=WHITE, items=[
+                    pm_item("📄 Xuất PDF (Nén theo MB)...", export_current_doc_pdf),
+                    pm_item("🖼️ Xuất ảnh JPG...", export_current_doc_jpgs),
+                    pm_item("🔤 Sắp xếp trang theo tên gốc", lambda _: sort_pages("name")),
+                    pm_item("🔃 Đảo ngược thứ tự trang", lambda _: sort_pages("reverse")),
+                ]),
             ], spacing=4)),
 
-            ft.Container(margin=mar_sym(10, 0), padding=12, bgcolor=WHITE, border_radius=10, content=ft.Column([
-                apply_all_switch,
-                ft.Text("1. Chế độ màu (mặc định: '🌟 Gốc Sáng Rõ'):", size=12, weight=ft.FontWeight.BOLD),
-                filter_chips_row,
-                ft.Divider(height=8),
-                ft.Row([ft.Icon(Icons.WB_SUNNY_OUTLINED, color="#FB8C00", size=20),
-                        ft.Text("Độ sáng (làm trắng nền giấy):", size=12, weight=ft.FontWeight.BOLD)]),
-                bright_slider,
-                ft.Row([ft.Icon(Icons.CONTRAST, color=CS_TEAL, size=20),
-                        ft.Text("Độ đậm (làm đen rõ nét chữ & chữ ký):", size=12, weight=ft.FontWeight.BOLD)]),
-                contrast_slider,
-                ft.Row([ft.Icon(Icons.AUTO_FIX_HIGH, color="#3949AB", size=20),
-                        ft.Text("Độ sắc nét viền chữ:", size=12, weight=ft.FontWeight.BOLD)]),
-                sharp_slider,
-            ], spacing=4)),
+            quality_alert_banner,
+
+            # 2. Khung xem trang lớn ở trung tâm (có nút nổi Hoàn tác & Phóng to)
+            ft.Container(
+                expand=True,
+                bgcolor="#1E272C",
+                padding=6,
+                content=ft.Stack([
+                    ft.GestureDetector(
+                        on_tap=lambda _: open_preview(app_data["active_page_idx"]),
+                        content=ft.Container(expand=True, alignment=ALIGN_CENTER, content=big_preview_img),
+                    ),
+                    ft.Container(
+                        left=8, top=6,
+                        bgcolor="#AA000000", padding=pad_sym(10, 4), border_radius=12,
+                        content=page_badge_txt,
+                    ),
+                    ft.Row([
+                        ft.Container(
+                            bgcolor="#CC263238", padding=pad_sym(10, 5), border_radius=14,
+                            on_click=undo_last,
+                            content=ft.Row([
+                                ft.Icon(Icons.UNDO, color=WHITE, size=15),
+                                ft.Text("Hoàn tác", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
+                            ], spacing=4),
+                        ),
+                        ft.Container(
+                            bgcolor="#CC00897B", padding=pad_sym(10, 5), border_radius=14,
+                            on_click=lambda _: open_preview(app_data["active_page_idx"]),
+                            content=ft.Row([
+                                ft.Icon(Icons.ZOOM_IN, color=WHITE, size=15),
+                                ft.Text("Xem rõ", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
+                            ], spacing=4),
+                        ),
+                    ], right=8, bottom=6, spacing=6),
+                ], expand=True),
+            ),
+
+            # 3. Dải Filmstrip các trang + Nút thêm nhanh
+            ft.Container(
+                bgcolor=WHITE,
+                padding=pad_sym(8, 4),
+                border=border_all(1, "#E0E6EA"),
+                content=ft.Column([
+                    ft.Row([
+                        ft.Row([
+                            ft.TextButton("☑️ Tất cả", on_click=lambda _: set_all_pages_checkbox(True)),
+                            ft.TextButton("⬜ Bỏ chọn", on_click=lambda _: set_all_pages_checkbox(False)),
+                        ], spacing=0),
+                        ft.Row([
+                            ft.Container(
+                                bgcolor=CS_ORANGE, padding=pad_sym(10, 5), border_radius=14,
+                                on_click=lambda _: open_camera_screen(new_doc=False, auto_crop=True, mode="doc"),
+                                content=ft.Text("📸 +Chụp", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
+                            ),
+                            ft.Container(
+                                bgcolor=CS_TEAL, padding=pad_sym(10, 5), border_radius=14,
+                                on_click=lambda _: show_import_sheet(False),
+                                content=ft.Text("🖼️ +Ảnh", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
+                            ),
+                        ], spacing=6),
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    page_strip_row,
+                ], spacing=2, tight=True),
+            ),
+
+            # 4. Bảng công cụ đáy chia 3 Tab chuẩn Mobile
+            ft.Container(
+                bgcolor=WHITE,
+                padding=pad_sym(8, 4),
+                content=ft.Column([
+                    tab_btn_row,
+                    studio_tab_body,
+                ], spacing=4, tight=True),
+            ),
         ])
         page.update()
 
     # =================================================================
-    # MÀN HÌNH 3: KÉO 4 GÓC THỦ CÔNG (GIỮ ĐÚNG TỶ LỆ ẢNH GỐC)
+    # MÀN HÌNH 3: KÉO 4 GÓC THỦ CÔNG (CHUẨN KHUNG MOBILE)
     # =================================================================
-    MAX_CROP_W, MAX_CROP_H = 360, 460
+    MAX_CROP_W, MAX_CROP_H = 350, 450
     crop_bg_image = make_img(width=MAX_CROP_W, height=MAX_CROP_H, fit=FIT.FILL)
     crop_ui = {"w": MAX_CROP_W, "h": MAX_CROP_H, "pts": [[20, 20], [330, 20], [330, 430], [20, 430]], "sx": 1.0, "sy": 1.0}
     corner_handles = []
@@ -2359,15 +2476,15 @@ def main(page: ft.Page):
         nx = max(0, min(cw, crop_ui["pts"][idx][0] + dx))
         ny = max(0, min(ch, crop_ui["pts"][idx][1] + dy))
         crop_ui["pts"][idx] = [nx, ny]
-        corner_handles[idx].left = nx - 18
-        corner_handles[idx].top = ny - 18
+        corner_handles[idx].left = nx - 20
+        corner_handles[idx].top = ny - 20
         update_crop_canvas()
         page.update()
 
     for i in range(4):
         corner_handles.append(ft.GestureDetector(
             left=0, top=0, on_pan_update=lambda e, ci=i: drag_corner_point(e, ci),
-            content=ft.Container(width=36, height=36, border_radius=18, bgcolor="#8800BFA5",
+            content=ft.Container(width=40, height=40, border_radius=20, bgcolor="#8800BFA5",
                                  border=border_all(3, WHITE), alignment=ALIGN_CENTER,
                                  content=ft.Container(width=10, height=10, border_radius=5, bgcolor="#FF1744"))))
 
@@ -2378,7 +2495,7 @@ def main(page: ft.Page):
         for i in range(4):
             cx, cy = float(real_corners[i][0]) / crop_ui["sx"], float(real_corners[i][1]) / crop_ui["sy"]
             crop_ui["pts"][i] = [cx, cy]
-            corner_handles[i].left, corner_handles[i].top = cx - 18, cy - 18
+            corner_handles[i].left, corner_handles[i].top = cx - 20, cy - 20
         update_crop_canvas()
 
     def apply_crop_to_page(e):
@@ -2395,7 +2512,7 @@ def main(page: ft.Page):
             save_page_meta(pg)
 
         run_bg(work, lambda _: (open_doc_studio(app_data["current_doc_idx"], keep_page=True),
-                                toast("📐 Đã cắt bỏ nền ngoài và làm phẳng trang giấy!")))
+                                toast("📐 Đã cắt phẳng trang giấy!")))
 
     def open_crop_screen(p_idx):
         doc = cur_doc()
@@ -2423,24 +2540,24 @@ def main(page: ft.Page):
             page.update()
 
         root_body.content = ft.Container(bgcolor=CS_DARK, expand=True, content=ft.Column([
-            ft.Container(padding=10, bgcolor="#11171A", content=ft.Row([
-                ft.TextButton("← Quay lại", style=ft.ButtonStyle(color=WHITE),
+            ft.Container(padding=pad_sym(8, 8), bgcolor="#11171A", content=ft.Row([
+                ft.IconButton(Icons.ARROW_BACK, icon_color=WHITE,
                               on_click=lambda _: open_doc_studio(app_data["current_doc_idx"], keep_page=True)),
-                ft.Text(f"Chỉnh 4 Góc - Trang {p_idx + 1}", color=WHITE, weight=ft.FontWeight.BOLD),
+                ft.Text(f"Chỉnh 4 Góc - Trang {p_idx + 1}", color=WHITE, weight=ft.FontWeight.BOLD, expand=True),
                 Btn("Cắt Phẳng ✓", bgcolor=CS_TEAL, color=WHITE, on_click=apply_crop_to_page),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
-            ft.Text("Kéo 4 nút tròn đặt vào 4 góc tờ giấy trên nền bàn", color="#B0BEC5", size=12),
+            ])),
+            ft.Text("Kéo 4 vòng tròn vào 4 góc tờ giấy", color="#B0BEC5", size=12),
             ft.Container(expand=True, alignment=ALIGN_CENTER,
                          content=ft.Stack(width=cw, height=ch, controls=[crop_bg_image] + corner_handles)),
             ft.Container(bgcolor="#11171A", padding=10, content=ft.Row([
-                ft.TextButton("🖼️ Lấy nguyên ảnh gốc", style=ft.ButtonStyle(color=WHITE), on_click=full),
-                ft.TextButton("🎯 AI Tự bắt góc giấy", style=ft.ButtonStyle(color=CS_ACCENT), on_click=ai),
-            ], alignment=ft.MainAxisAlignment.SPACE_AROUND)),
+                OutBtn("🖼️ Lấy hết khung", on_click=full),
+                Btn("🎯 AI Tự bắt góc", bgcolor=CS_TEAL, color=WHITE, on_click=ai),
+            ], alignment=ft.MainAxisAlignment.SPACE_EVENLY)),
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True))
         page.update()
 
     # =================================================================
-    # MÀN HÌNH 4: CHE THÔNG TIN NHẠY CẢM (ĐÃ SỬA LỖI UNDO & XÓA)
+    # MÀN HÌNH 4: CHE THÔNG TIN NHẠY CẢM (MOBILE TOUCH OPTIMIZED)
     # =================================================================
     def open_redact_screen(p_idx):
         doc = cur_doc()
@@ -2475,9 +2592,24 @@ def main(page: ft.Page):
         }
 
         red_img = make_img(width=cw, height=ch, fit=FIT.FILL)
-        count_txt = ft.Text("", color="#A7FFEB", size=12, weight=ft.FontWeight.BOLD)
-        undo_btn = OutBtn("↩️ Bỏ ô vừa vẽ (0)")
+        count_txt = ft.Text("", color="#A7FFEB", size=11, weight=ft.FontWeight.BOLD)
+        undo_btn = OutBtn("↩️ Bỏ ô (0)")
         clear_btn = OutBtn("🗑️ Xóa hết")
+        mode_row = ft.Row(alignment=ft.MainAxisAlignment.CENTER, spacing=6)
+
+        def build_mode_pills():
+            mode_row.controls.clear()
+            for m_code, m_label in [("black", "⬛ Ô đen"), ("pixel", "🟧 Làm mờ"), ("white", "⬜ Xóa trắng")]:
+                on = (state["mode"] == m_code)
+                mode_row.controls.append(
+                    ft.Container(
+                        padding=pad_sym(12, 6),
+                        border_radius=14,
+                        bgcolor=CS_TEAL if on else "#263238",
+                        on_click=lambda e, mc=m_code: (state.update({"mode": mc}), build_mode_pills(), page.update()),
+                        content=ft.Text(m_label, size=11, weight=ft.FontWeight.BOLD, color=WHITE),
+                    )
+                )
 
         def redraw():
             canvas = disp_base.copy()
@@ -2498,8 +2630,8 @@ def main(page: ft.Page):
             set_img(red_img, img_to_b64(canvas, q_val))
 
             n_boxes = len(state["boxes"])
-            count_txt.value = f"Đang có: {n_boxes} vùng che (Kéo để vẽ mới • Chạm vào ô đã vẽ để xóa ô đó)"
-            set_btn_text(undo_btn, f"↩️ Bỏ ô vừa vẽ ({n_boxes})")
+            count_txt.value = f"Đã che: {n_boxes} vùng (Kéo ngón tay để vẽ • Chạm vào ô để xóa)"
+            set_btn_text(undo_btn, f"↩️ Bỏ ô ({n_boxes})")
             undo_btn.disabled = (n_boxes == 0)
             clear_btn.disabled = (n_boxes == 0)
 
@@ -2561,18 +2693,15 @@ def main(page: ft.Page):
             redraw()
 
         def undo_last_box(e):
-            if not state["boxes"]:
-                toast("Không còn ô che nào để hoàn tác!", Colors.ORANGE_800)
-                return
-            state["boxes"].pop()
-            redraw()
+            if state["boxes"]:
+                state["boxes"].pop()
+                redraw()
 
         def clear_all_boxes(e):
-            if not state["boxes"]:
-                return
-            state["boxes"].clear()
-            redraw()
-            toast("🗑️ Đã xóa sạch tất cả các ô che trên trang này!")
+            if state["boxes"]:
+                state["boxes"].clear()
+                redraw()
+                toast("🗑️ Đã xóa hết các ô che!")
 
         def save_redactions(e):
             snapshot_doc(doc)
@@ -2584,34 +2713,21 @@ def main(page: ft.Page):
 
             def done(_):
                 open_doc_studio(app_data["current_doc_idx"], keep_page=True)
-                if pg["redactions"]:
-                    toast(f"⬛ Đã áp dụng {len(pg['redactions'])} vùng che thông tin!")
-                else:
-                    toast("✨ Đã gỡ toàn bộ vùng che thông tin trên trang!")
+                toast(f"⬛ Đã lưu {len(pg['redactions'])} vùng che thông tin!")
 
             run_bg(work, done)
 
         undo_btn.on_click = undo_last_box
         clear_btn.on_click = clear_all_boxes
-
-        mode_dd = ft.Dropdown(
-            width=175,
-            value="black",
-            options=[
-                DDOpt(key="black", text="⬛ Ô đen kín"),
-                DDOpt(key="pixel", text="🟧 Làm mờ Pixel"),
-                DDOpt(key="white", text="⬜ Xóa trắng"),
-            ],
-            on_change=lambda e: state.update({"mode": e.control.value or "black"}),
-        )
+        build_mode_pills()
 
         root_body.content = ft.Container(bgcolor=CS_DARK, expand=True, content=ft.Column([
-            ft.Container(padding=10, bgcolor="#11171A", content=ft.Row([
-                ft.TextButton("← Hủy / Quay lại", style=ft.ButtonStyle(color=WHITE),
+            ft.Container(padding=pad_sym(8, 8), bgcolor="#11171A", content=ft.Row([
+                ft.IconButton(Icons.ARROW_BACK, icon_color=WHITE,
                               on_click=lambda _: open_doc_studio(app_data["current_doc_idx"], keep_page=True)),
-                ft.Text(f"Che thông tin - Trang {p_idx + 1}", color=WHITE, weight=ft.FontWeight.BOLD),
-                Btn("Lưu áp dụng ✓", bgcolor=CS_TEAL, color=WHITE, on_click=save_redactions),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
+                ft.Text(f"Che Thông Tin - Trang {p_idx + 1}", color=WHITE, weight=ft.FontWeight.BOLD, expand=True),
+                Btn("Lưu ✓", bgcolor=CS_TEAL, color=WHITE, on_click=save_redactions),
+            ])),
             count_txt,
             ft.Container(
                 expand=True, alignment=ALIGN_CENTER,
@@ -2630,16 +2746,15 @@ def main(page: ft.Page):
                     ],
                 ),
             ),
-            ft.Container(bgcolor="#11171A", padding=10, content=ft.Row([
-                mode_dd,
-                undo_btn,
-                clear_btn,
-            ], alignment=ft.MainAxisAlignment.SPACE_AROUND, scroll=ft.ScrollMode.AUTO)),
+            ft.Container(bgcolor="#11171A", padding=10, content=ft.Column([
+                mode_row,
+                ft.Row([undo_btn, clear_btn], alignment=ft.MainAxisAlignment.SPACE_EVENLY),
+            ], spacing=8, tight=True)),
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True))
         redraw()
 
     # =================================================================
-    # MÀN HÌNH 5: TÁCH NỀN & CHÈN CHỮ KÝ TÙY CHỌN VỊ TRÍ
+    # MÀN HÌNH 5: TÁCH NỀN & CHÈN CHỮ KÝ (MOBILE TOUCH)
     # =================================================================
     def list_saved_signatures():
         if not os.path.isdir(SIG_DIR):
@@ -2668,7 +2783,7 @@ def main(page: ft.Page):
 
         sig_preview = make_img(width=cw, height=ch, fit=FIT.FILL)
         size_slider = ft.Slider(min=0.12, max=0.65, divisions=15, value=float(active_sig.get("w", 0.30)),
-                                label="Độ lớn chữ ký: {value}", active_color=CS_ACCENT)
+                                label="Cỡ: {value}", active_color=CS_ACCENT, expand=True)
         sig_handle = ft.GestureDetector(
             left=int(active_sig["x"] * cw) - 22,
             top=int(active_sig["y"] * ch) - 22,
@@ -2702,13 +2817,7 @@ def main(page: ft.Page):
             page.update()
 
         sig_handle.on_pan_update = on_drag_handle
-
-        def on_size_change(e):
-            active_sig["w"] = float(size_slider.value)
-            redraw()
-            page.update()
-
-        size_slider.on_change = on_size_change
+        size_slider.on_change = lambda e: (active_sig.update({"w": float(size_slider.value)}), redraw(), page.update())
 
         def import_new_sig(_):
             app_data["picker_mode"] = "import_sig"
@@ -2719,7 +2828,7 @@ def main(page: ft.Page):
 
         def save_sig_to_page(_):
             if not active_sig.get("file"):
-                toast("⚠️ Hãy tải hoặc chụp ảnh chữ ký trước!", Colors.ORANGE_800)
+                toast("⚠️ Hãy chụp hoặc chọn ảnh chữ ký trước!", Colors.ORANGE_800)
                 return
             snapshot_doc(doc)
             pg["signatures"] = current_sig_list()
@@ -2729,7 +2838,7 @@ def main(page: ft.Page):
                 save_page_meta(pg)
 
             run_bg(work, lambda _: (open_doc_studio(app_data["current_doc_idx"], keep_page=True),
-                                    toast("✍️ Đã gắn chữ ký vào trang tài liệu!")))
+                                    toast("✍️ Đã gắn chữ ký!")))
 
         def clear_sigs(_):
             snapshot_doc(doc)
@@ -2740,49 +2849,36 @@ def main(page: ft.Page):
                 save_page_meta(pg)
 
             run_bg(work, lambda _: (open_doc_studio(app_data["current_doc_idx"], keep_page=True),
-                                    toast("🗑️ Đã xóa chữ ký khỏi trang!")))
-
-        sig_dd = ft.Dropdown(
-            width=160,
-            label="Mẫu chữ ký",
-            value=active_sig.get("file", ""),
-            options=[DDOpt(key=f, text=f) for f in sigs],
-            on_change=lambda e: (active_sig.update({"file": e.control.value or ""}), redraw(), page.update()),
-        )
+                                    toast("🗑️ Đã gỡ chữ ký!")))
 
         redraw()
         root_body.content = ft.Container(bgcolor=CS_DARK, expand=True, content=ft.Column([
-            ft.Container(padding=10, bgcolor="#11171A", content=ft.Row([
-                ft.TextButton("← Quay lại", style=ft.ButtonStyle(color=WHITE),
+            ft.Container(padding=pad_sym(8, 8), bgcolor="#11171A", content=ft.Row([
+                ft.IconButton(Icons.ARROW_BACK, icon_color=WHITE,
                               on_click=lambda _: open_doc_studio(app_data["current_doc_idx"], keep_page=True)),
-                ft.Text(f"Chèn Chữ Ký - Trang {p_idx + 1}", color=WHITE, weight=ft.FontWeight.BOLD),
-                Btn("Gắn Chữ Ký ✓", bgcolor=CS_TEAL, color=WHITE, on_click=save_sig_to_page),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
-            ft.Text("Kéo nút tròn ✥ để di chuyển chữ ký đến đúng vị trí (App tự động tách nền giấy trắng)",
-                    color="#B0BEC5", size=12),
+                ft.Text(f"Chèn Chữ Ký - Trang {p_idx + 1}", color=WHITE, weight=ft.FontWeight.BOLD, expand=True),
+                Btn("Gắn ✓", bgcolor=CS_TEAL, color=WHITE, on_click=save_sig_to_page),
+            ])),
+            ft.Text("Kéo nút tròn ✥ để đặt chữ ký vào vị trí mong muốn", color="#B0BEC5", size=12),
             ft.Container(
                 expand=True, alignment=ALIGN_CENTER,
                 content=ft.Stack(width=cw, height=ch, controls=[sig_preview, sig_handle]),
             ),
             ft.Container(bgcolor="#11171A", padding=10, content=ft.Column([
-                size_slider,
+                ft.Row([ft.Text("Độ lớn:", color=WHITE, size=12), size_slider]),
                 ft.Row([
-                    Btn("📸 Chụp chữ ký", bgcolor="#D84315", color=WHITE, on_click=capture_sig_from_cam),
-                    Btn("➕ Chọn ảnh", bgcolor=CS_TEAL, color=WHITE, on_click=import_new_sig),
-                    sig_dd,
+                    Btn("📸 Chụp Ký", bgcolor=CS_ORANGE, color=WHITE, on_click=capture_sig_from_cam),
+                    Btn("🖼️ Chọn Ảnh", bgcolor=CS_TEAL, color=WHITE, on_click=import_new_sig),
                     OutBtn("🗑️ Gỡ", on_click=clear_sigs),
-                ], alignment=ft.MainAxisAlignment.SPACE_AROUND, scroll=ft.ScrollMode.AUTO),
-            ], tight=True, spacing=4)),
+                ], alignment=ft.MainAxisAlignment.SPACE_EVENLY),
+            ], tight=True, spacing=6)),
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True))
         page.update()
 
     # =================================================================
-    # MÀN HÌNH 6: CHỤP ẢNH TRỰC TIẾP TỪ CAMERA TRONG APP (LIVE SCANNER)
+    # MÀN HÌNH 6: CAMERA ĐIỆN THOẠI (NÚT SHUTTER TRÒN LỚN Ở GIỮA ĐÁY)
     # =================================================================
     def open_camera_screen(new_doc=True, auto_crop=True, folder="Chung", mode="doc"):
-        """
-        mode: 'doc' (chụp trang tài liệu liên tục) hoặc 'sig' (chụp ảnh chữ ký trên giấy trắng).
-        """
         page.floating_action_button = None
         app_data["cam_running"] = True
 
@@ -2801,17 +2897,11 @@ def main(page: ft.Page):
             "lum_val": 140.0,
         }
 
-        cam_view_img = make_img(width=380, height=440, fit=FIT.CONTAIN)
-        cam_status_txt = ft.Text("⏳ Đang khởi động Camera...", color="#A7FFEB", size=12, weight=ft.FontWeight.BOLD)
+        cam_view_img = make_img(expand=True, fit=FIT.CONTAIN)
+        cam_status_txt = ft.Text("⏳ Đang mở Camera...", color="#A7FFEB", size=12, weight=ft.FontWeight.BOLD)
         cam_quality_txt = ft.Text("", color="#FFE082", size=11, weight=ft.FontWeight.BOLD)
-        captured_strip = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=6, height=68)
-        done_btn = Btn("Hoàn tất (0) ✓", bgcolor=CS_TEAL, color=WHITE, disabled=True)
-        guide_sw = ft.Switch(
-            label="Tự nhận diện viền giấy (khung xanh)",
-            value=cam_state["auto_guide"],
-            active_color=CS_ACCENT,
-            on_change=lambda e: cam_state.update({"auto_guide": bool(e.control.value)}),
-        )
+        captured_strip = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=6, height=62)
+        done_badge_txt = ft.Text("Xong (0)", color=WHITE, weight=ft.FontWeight.BOLD, size=13)
 
         def release_cam():
             app_data["cam_running"] = False
@@ -2838,7 +2928,6 @@ def main(page: ft.Page):
             else:
                 cap = cv2.VideoCapture(idx)
             if cap and cap.isOpened():
-                # Ưu tiên xin độ phân giải HD/FullHD để bản chụp sắc nét
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
                 return cap
@@ -2847,23 +2936,22 @@ def main(page: ft.Page):
         def refresh_captured_strip():
             captured_strip.controls.clear()
             n = len(cam_state["captured_frames"])
-            set_btn_text(done_btn, f"Hoàn tất ({n}) ✓")
-            done_btn.disabled = (n == 0)
+            done_badge_txt.value = f"Lưu ({n}) ✓"
             for idx_f, frm in enumerate(cam_state["captured_frames"]):
-                th = fit_max(frm, 120)
+                th = fit_max(frm, 110)
                 b64 = img_to_b64(th, 75)
                 captured_strip.controls.append(
                     ft.Container(
-                        width=56, height=64, padding=2, bgcolor="#263238", border_radius=6,
+                        width=50, height=58, padding=2, bgcolor="#263238", border_radius=6,
                         content=ft.Stack([
-                            make_img(b64, width=52, height=60, fit=FIT.COVER),
+                            make_img(b64, width=46, height=54, fit=FIT.COVER),
                             ft.GestureDetector(
                                 right=0, top=0,
                                 on_tap=lambda e, i=idx_f: remove_captured(i),
                                 content=ft.Container(
-                                    width=18, height=18, bgcolor=Colors.RED_700, border_radius=9,
+                                    width=16, height=16, bgcolor=Colors.RED_700, border_radius=8,
                                     alignment=ALIGN_CENTER,
-                                    content=ft.Text("×", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
+                                    content=ft.Text("×", color=WHITE, size=10, weight=ft.FontWeight.BOLD),
                                 ),
                             ),
                         ]),
@@ -2879,23 +2967,16 @@ def main(page: ft.Page):
         def switch_camera(_):
             cam_state["cam_idx"] = (cam_state["cam_idx"] + 1) % 3
             cam_state["switching"] = True
-            cam_status_txt.value = f"🔄 Đang chuyển sang Camera #{cam_state['cam_idx']}..."
+            cam_status_txt.value = f"🔄 Đang chuyển Cam #{cam_state['cam_idx']}..."
             page.update()
 
-        def rotate_cam_frame(_):
-            cam_state["rot"] = (cam_state["rot"] + 90) % 360
-
-        def toggle_mirror(_):
-            cam_state["mirror"] = not cam_state["mirror"]
-
-        def snap_photo(_):
+        def snap_photo(_=None):
             raw = cam_state.get("last_raw")
             if raw is None:
-                toast("⚠️ Chưa nhận được hình ảnh từ Camera!", Colors.ORANGE_800)
+                toast("⚠️ Chưa có tín hiệu Camera!", Colors.ORANGE_800)
                 return
             frame_copy = raw.copy()
 
-            # Nếu đang ở chế độ chụp chữ ký -> xử lý luôn
             if mode == "sig":
                 release_cam()
 
@@ -2912,24 +2993,24 @@ def main(page: ft.Page):
                         {"file": fn, "x": 0.72, "y": 0.82, "w": 0.30, "opacity": 0.95}
                     )
                     open_signature_screen(app_data["active_page_idx"])
-                    toast("✍️ Đã chụp & tách nền chữ ký thành công!")
+                    toast("✍️ Đã chụp & tách nền chữ ký!")
 
                 run_bg(work_sig, done_sig)
                 return
 
-            # Chế độ chụp tài liệu (cho phép chụp nhiều trang liên tiếp)
             cam_state["captured_frames"].append(frame_copy)
             refresh_captured_strip()
             q_check = analyze_image_quality(frame_copy)
             if q_check["is_blur"]:
-                toast(f"⚠️ Đã chụp Trang #{len(cam_state['captured_frames'])} nhưng ảnh hơi MỜ (rung tay)! Bạn có thể bấm × để chụp lại.", Colors.ORANGE_900)
+                toast(f"⚠️ Trang #{len(cam_state['captured_frames'])} hơi MỜ! Bấm × trên ảnh nhỏ nếu muốn chụp lại.", Colors.ORANGE_900)
             else:
-                toast(f"📸 Đã chụp Trang #{len(cam_state['captured_frames'])}! Có thể chụp tiếp trang sau hoặc bấm 'Hoàn tất ✓'.")
+                toast(f"📸 Đã chụp trang #{len(cam_state['captured_frames'])}!")
             page.update()
 
-        def finish_capture(_):
+        def finish_capture(_=None):
             frames = list(cam_state["captured_frames"])
             if not frames:
+                toast("⚠️ Hãy bấm nút tròn ở giữa để chụp ít nhất 1 trang!", Colors.ORANGE_800)
                 return
             use_crop = bool(cam_state["auto_guide"])
             release_cam()
@@ -2948,7 +3029,7 @@ def main(page: ft.Page):
 
             def done(new_pages):
                 if new_doc or app_data["current_doc_idx"] < 0 or not app_data["docs"]:
-                    doc = new_doc_record(f"Quét Camera #{len(app_data['docs']) + 1}", new_pages, folder=folder)
+                    doc = new_doc_record(f"Scan Camera #{len(app_data['docs']) + 1}", new_pages, folder=folder)
                     app_data["docs"].insert(0, doc)
                     save_doc(doc)
                     open_doc_studio(0)
@@ -2958,11 +3039,11 @@ def main(page: ft.Page):
                     doc["undo"].clear()
                     save_doc(doc)
                     open_doc_studio(app_data["current_doc_idx"], keep_page=True)
-                toast(f"🎯 Đã xử lý & lưu {len(new_pages)} trang từ Camera!")
+                toast(f"🎯 Đã lưu {len(new_pages)} trang!")
 
             run_bg(work, done)
 
-        def cancel_camera(_):
+        def cancel_camera(_=None):
             release_cam()
             if mode == "sig":
                 open_signature_screen(app_data["active_page_idx"])
@@ -2970,8 +3051,6 @@ def main(page: ft.Page):
                 open_doc_studio(app_data["current_doc_idx"], keep_page=True)
             else:
                 render_home_view()
-
-        done_btn.on_click = finish_capture
 
         def camera_loop():
             cap = open_capture_device(cam_state["cam_idx"])
@@ -2981,15 +3060,15 @@ def main(page: ft.Page):
             cam_state["cap"] = cap
 
             if cap is None:
-                cam_status_txt.value = "❌ Không tìm thấy Camera/Webcam trên thiết bị này!"
-                cam_quality_txt.value = "Hãy kiểm tra kết nối Webcam hoặc dùng nút 'Tải Ảnh Lên'"
+                cam_status_txt.value = "❌ Không tìm thấy Camera!"
+                cam_quality_txt.value = "Hãy dùng tính năng 'Tải Ảnh Lên'"
                 try:
                     page.update()
                 except Exception:
                     pass
                 return
 
-            cam_status_txt.value = f"🟢 Camera #{cam_state['cam_idx']} đang hoạt động"
+            cam_status_txt.value = f"🟢 Cam #{cam_state['cam_idx']}"
             frame_counter = 0
 
             while app_data.get("cam_running", False):
@@ -3002,9 +3081,8 @@ def main(page: ft.Page):
                     cam_state["cap"] = new_cap
                     cap = new_cap
                     if cap is None:
-                        cam_status_txt.value = "❌ Không mở được Camera!"
                         break
-                    cam_status_txt.value = f"🟢 Camera #{cam_state['cam_idx']} đang hoạt động"
+                    cam_status_txt.value = f"🟢 Cam #{cam_state['cam_idx']}"
 
                 ok, frame = cap.read()
                 if not ok or frame is None:
@@ -3025,7 +3103,6 @@ def main(page: ft.Page):
                 disp = fit_max(frame, 640).copy()
                 dh, dw = disp.shape[:2]
 
-                # Định kỳ mỗi 4 frame đo độ nét và dò 4 góc tờ giấy để không gây lag
                 frame_counter += 1
                 if frame_counter % 4 == 0:
                     gray_s = cv2.cvtColor(disp, cv2.COLOR_BGR2GRAY)
@@ -3038,7 +3115,6 @@ def main(page: ft.Page):
                     else:
                         cam_state["found_doc"] = False
 
-                # Vẽ khung xanh nhận diện tờ giấy lên màn hình ngắm
                 if cam_state["auto_guide"] and cam_state.get("quad") is not None and cam_state.get("found_doc"):
                     pts = np.array(cam_state["quad"], dtype=np.int32)
                     overlay = disp.copy()
@@ -3046,28 +3122,22 @@ def main(page: ft.Page):
                     cv2.addWeighted(overlay, 0.18, disp, 0.82, 0, disp)
                     cv2.polylines(disp, [pts], True, (0, 230, 118), 3, cv2.LINE_AA)
                 elif mode == "sig":
-                    # Khung ngắm chữ ký ở giữa màn hình
                     sx1, sy1 = int(dw * 0.12), int(dh * 0.30)
                     sx2, sy2 = int(dw * 0.88), int(dh * 0.70)
                     cv2.rectangle(disp, (sx1, sy1), (sx2, sy2), (0, 230, 118), 2)
 
                 b_val, l_val = cam_state["blur_val"], cam_state["lum_val"]
-                q_tags = []
-                if b_val < 55:
-                    q_tags.append("⚠️ Hơi mờ / Rung tay")
-                else:
-                    q_tags.append(f"✅ Rõ nét ({int(b_val)})")
+                q_tags = ["⚠️ Rung tay" if b_val < 55 else "✅ Nét"]
                 if l_val < 70:
-                    q_tags.append("⚠️ Thiếu sáng")
+                    q_tags.append("⚠️ Hơi tối")
                 if cam_state["auto_guide"]:
-                    q_tags.append("🎯 Đã bắt được góc giấy" if cam_state["found_doc"] else "🔍 Đang tìm mép giấy...")
-                cam_quality_txt.value = "  •  ".join(q_tags)
+                    q_tags.append("🎯 Đã bắt khung" if cam_state["found_doc"] else "🔍 Tìm mép giấy")
+                cam_quality_txt.value = " • ".join(q_tags)
 
                 set_img(cam_view_img, img_to_b64(disp, 78))
                 try:
                     cam_view_img.update()
                     cam_quality_txt.update()
-                    cam_status_txt.update()
                 except Exception:
                     page.update()
 
@@ -3075,34 +3145,59 @@ def main(page: ft.Page):
 
             release_cam()
 
-        header_title = "📸 Chụp Chữ Ký Trên Giấy Trắng" if mode == "sig" else "📸 Máy Ảnh Quét Tài Liệu"
-        root_body.content = ft.Container(bgcolor=CS_DARK, expand=True, content=ft.Column([
-            ft.Container(padding=10, bgcolor="#11171A", content=ft.Row([
-                ft.TextButton("← Đóng Camera", style=ft.ButtonStyle(color=WHITE), on_click=cancel_camera),
-                ft.Text(header_title, color=WHITE, weight=ft.FontWeight.BOLD, size=14),
-                done_btn if mode == "doc" else ft.Container(),
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
+        # Giao diện Camera chuẩn Điện thoại: Nút chụp tròn lớn 72px ở đáy
+        shutter_button = ft.GestureDetector(
+            on_tap=snap_photo,
+            content=ft.Container(
+                width=72, height=72, border_radius=36,
+                border=border_all(4, WHITE),
+                padding=4,
+                alignment=ALIGN_CENTER,
+                content=ft.Container(width=56, height=56, border_radius=28, bgcolor=CS_ORANGE),
+            ),
+        )
 
-            ft.Container(padding=pad_sym(10, 2), content=ft.Column([
-                cam_status_txt,
-                cam_quality_txt,
-            ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER)),
+        root_body.content = ft.Container(bgcolor="#0B0F12", expand=True, content=ft.Column([
+            # Top Camera Bar
+            ft.Container(padding=pad_sym(8, 6), bgcolor="#11171A", content=ft.Row([
+                ft.IconButton(Icons.CLOSE, icon_color=WHITE, on_click=cancel_camera),
+                ft.Column([cam_status_txt, cam_quality_txt], spacing=1, expand=True,
+                          horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.IconButton(Icons.ROTATE_90_DEGREES_CW, icon_color=WHITE, tooltip="Xoay khung ngắm",
+                              on_click=lambda _: cam_state.update({"rot": (cam_state["rot"] + 90) % 360})),
+                ft.IconButton(Icons.FLIP, icon_color=WHITE, tooltip="Lật gương",
+                              on_click=lambda _: cam_state.update({"mirror": not cam_state["mirror"]})),
+            ])),
 
+            # Kính ngắm Camera chiếm trọn phần giữa
             ft.Container(expand=True, alignment=ALIGN_CENTER, content=cam_view_img),
 
-            captured_strip if mode == "doc" else ft.Container(),
+            # Dải trang vừa chụp
+            ft.Container(padding=pad_sym(10, 2), content=captured_strip) if mode == "doc" else ft.Container(),
 
-            ft.Container(bgcolor="#11171A", padding=10, content=ft.Column([
-                guide_sw if mode == "doc" else ft.Text("Đặt chữ ký trên nền giấy trắng vào giữa khung xanh rồi bấm Chụp",
-                                                       color="#B0BEC5", size=12),
-                ft.Row([
-                    OutBtn("🔄 Đổi Cam", on_click=switch_camera),
-                    OutBtn("↻ Xoay 90°", on_click=rotate_cam_frame),
-                    OutBtn("↔ Lật gương", on_click=toggle_mirror),
-                    Btn("📸 CHỤP NGAY", bgcolor="#D84315", color=WHITE, on_click=snap_photo),
-                ], alignment=ft.MainAxisAlignment.SPACE_AROUND, scroll=ft.ScrollMode.AUTO),
-            ], spacing=6, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER)),
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True, spacing=4))
+            # Cụm điều khiển đáy chuẩn máy ảnh điện thoại
+            ft.Container(
+                bgcolor="#11171A",
+                padding=pad_sym(18, 12),
+                content=ft.Row([
+                    ft.Container(
+                        width=86, height=42, border_radius=21, bgcolor="#263238",
+                        alignment=ALIGN_CENTER, on_click=switch_camera,
+                        content=ft.Row([
+                            ft.Icon(Icons.cameraswitch if hasattr(Icons, "cameraswitch") else Icons.REFRESH, color=WHITE, size=18),
+                            ft.Text("Đổi Cam", color=WHITE, size=12, weight=ft.FontWeight.BOLD),
+                        ], alignment=ft.MainAxisAlignment.CENTER, spacing=4),
+                    ),
+                    shutter_button,
+                    ft.Container(
+                        width=86, height=42, border_radius=21, bgcolor=CS_TEAL,
+                        alignment=ALIGN_CENTER,
+                        on_click=finish_capture if mode == "doc" else snap_photo,
+                        content=done_badge_txt if mode == "doc" else ft.Text("Chụp Ký", color=WHITE, size=12, weight=ft.FontWeight.BOLD),
+                    ),
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            ),
+        ], expand=True, spacing=0))
         page.update()
 
         threading.Thread(target=camera_loop, daemon=True).start()
@@ -3166,9 +3261,9 @@ def main(page: ft.Page):
                     msg_parts.append(f"{len(blur_list)} ảnh MỜ")
                 if dark_list:
                     msg_parts.append(f"{len(dark_list)} ảnh TỐI")
-                toast(f"⚠️ Cảnh báo: Phát hiện {' & '.join(msg_parts)}! Hãy kiểm tra các trang có dấu ⚠️.", Colors.ORANGE_900)
+                toast(f"⚠️ Phát hiện {' & '.join(msg_parts)}! Hãy kiểm tra các trang có dấu ⚠️.", Colors.ORANGE_900)
             else:
-                toast(f"🎯 Đã xử lý & lưu {len(new_pages)} trang rõ nét!")
+                toast(f"🎯 Đã xử lý {len(new_pages)} trang rõ nét!")
 
         run_bg(work, done)
 
@@ -3191,7 +3286,7 @@ def main(page: ft.Page):
             pg = doc["pages"][app_data["active_page_idx"]]
             pg.setdefault("signatures", []).append({"file": fn, "x": 0.72, "y": 0.82, "w": 0.30, "opacity": 0.95})
             open_signature_screen(app_data["active_page_idx"])
-            toast("✍️ Đã tách nền chữ ký! Hãy kéo nút ✥ đến vị trí mong muốn.")
+            toast("✍️ Đã tách nền chữ ký!")
 
         run_bg(work, done)
 
@@ -3207,7 +3302,7 @@ def main(page: ft.Page):
             app_data["docs"] = load_all_docs()
             app_data["trash"] = purge_and_load_trash()
             render_home_view()
-            toast(f"📥 Đã khôi phục thành công {cnt} bộ tài liệu từ bản sao lưu!")
+            toast(f"📥 Đã khôi phục {cnt} bộ tài liệu!")
 
         run_bg(work, done)
 
@@ -3244,53 +3339,48 @@ def main(page: ft.Page):
 
     def show_import_sheet(new_doc):
         import_state["new_doc"] = new_doc
-        crop_chk = ft.Switch(label="Tự động cắt bỏ nền bàn & kéo thẳng trang giấy", value=True, active_color=CS_TEAL)
-
-        dd_order = ft.Dropdown(label="Thứ tự các trang khi tải lên", value="name", options=[
-            DDOpt(key="name", text="Theo tên file (IMG_001, IMG_002...)"),
-            DDOpt(key="time", text="Theo thời gian chụp / lưu file"),
-            DDOpt(key="pick", text="Giữ nguyên thứ tự máy trả về")])
         default_folder = app_data["active_folder"] if app_data["active_folder"] != "Tất cả" else "Chung"
-        tf_folder = ft.TextField(value=default_folder, label="Thư mục lưu tài liệu (VD: Chung, Hồ sơ, CCCD...)")
-        rev_chk = ft.Switch(label="Đảo ngược thứ tự (chụp từ mới đến cũ)", value=False, active_color=CS_TEAL)
+        tf_folder = ft.TextField(value=default_folder, label="Lưu vào Thư mục", height=44, text_size=13)
+        dd_order = ft.Dropdown(label="Thứ tự sắp xếp trang", value="name", options=[
+            DDOpt(key="name", text="Theo tên file (IMG_1, IMG_2...)"),
+            DDOpt(key="time", text="Theo thời gian chụp"),
+            DDOpt(key="pick", text="Giữ nguyên thứ tự chọn")])
 
         def pick_now(auto_c):
             import_state["auto"] = auto_c
             import_state["order"] = dd_order.value or "name"
-            import_state["reverse"] = bool(rev_chk.value)
             import_state["folder"] = (tf_folder.value or "").strip() or "Chung"
             app_data["picker_mode"] = "import_images"
             close_dlg(bs)
             pick_files_generic(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
 
-        def start_live_cam(_):
-            fld = (tf_folder.value or "").strip() or "Chung"
-            auto_c = bool(crop_chk.value)
-            close_dlg(bs)
-            open_camera_screen(new_doc=new_doc, auto_crop=auto_c, folder=fld, mode="doc")
-
-        bs = ft.BottomSheet(ft.Container(padding=18, bgcolor=WHITE, content=ft.Column([
-            ft.Text("Quét Tài Liệu Mới (Chụp trực tiếp hoặc Tải ảnh)", weight=ft.FontWeight.BOLD, size=16),
-            crop_chk,
+        bs = ft.BottomSheet(ft.Container(padding=16, bgcolor=WHITE, border_radius=16, content=ft.Column([
+            ft.Text("Chọn Ảnh Từ Thiết Bị", weight=ft.FontWeight.BOLD, size=15),
             tf_folder if new_doc else ft.Container(),
-            ft.ListTile(
-                leading=ft.Icon(Icons.PHOTO_CAMERA, color="#D84315", size=34),
-                title=ft.Text("📸 Chụp trực tiếp bằng Camera trong App", weight=ft.FontWeight.BOLD, color="#D84315"),
-                subtitle=ft.Text("Ngắm trực tiếp, tự bắt 4 góc giấy, báo rung tay & chụp nhiều trang liên tục"),
-                on_click=start_live_cam,
-            ),
-            ft.Divider(height=4),
             dd_order,
-            rev_chk,
-            ft.ListTile(leading=ft.Icon(Icons.CROP_FREE, color=CS_TEAL, size=32),
-                        title=ft.Text("📂 Chọn ảnh từ máy & tự cắt nền bàn", weight=ft.FontWeight.BOLD),
-                        subtitle=ft.Text("Tự nhận diện 4 góc tờ giấy, cắt mặt bàn và kiểm tra độ nét"),
-                        on_click=lambda _: pick_now(crop_chk.value)),
-            ft.ListTile(leading=ft.Icon(Icons.IMAGE_OUTLINED, color="#546E7A", size=32),
-                        title=ft.Text("🖼️ Chọn ảnh từ máy & giữ nguyên khung 100%"),
-                        subtitle=ft.Text("Dành cho ảnh đã được cắt sẵn"),
-                        on_click=lambda _: pick_now(False)),
-        ], tight=True, spacing=4)))
+            ft.Container(
+                bgcolor="#E0F2F1", border_radius=12, padding=10,
+                on_click=lambda _: pick_now(True),
+                content=ft.Row([
+                    ft.Icon(Icons.CROP_FREE, color=CS_TEAL, size=28),
+                    ft.Column([
+                        ft.Text("Tự động cắt nền bàn & làm phẳng (Khuyên dùng)", weight=ft.FontWeight.BOLD, size=13, color=CS_TEAL),
+                        ft.Text("AI tự tìm 4 góc giấy, làm sáng & đo độ nét", size=11, color="#455A64"),
+                    ], spacing=2, expand=True),
+                ], spacing=10),
+            ),
+            ft.Container(
+                bgcolor="#F5F7F9", border_radius=12, padding=10,
+                on_click=lambda _: pick_now(False),
+                content=ft.Row([
+                    ft.Icon(Icons.IMAGE_OUTLINED, color="#546E7A", size=28),
+                    ft.Column([
+                        ft.Text("Giữ nguyên 100% khung ảnh gốc", weight=ft.FontWeight.BOLD, size=13),
+                        ft.Text("Dành cho ảnh thẻ hoặc tài liệu đã cắt sẵn", size=11, color="#546E7A"),
+                    ], spacing=2, expand=True),
+                ], spacing=10),
+            ),
+        ], tight=True, spacing=8)))
         open_dlg(bs)
 
     page.add(ft.SafeArea(content=ft.Column([busy_bar, root_body], expand=True, spacing=0), expand=True))
