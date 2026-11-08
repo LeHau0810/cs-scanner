@@ -1,20 +1,11 @@
 """
-CS Scanner Pro V6.4 - Mobile UI & Android APK Ready Edition
-- Tương thích hoàn toàn Flet 0.70+ (Android APK / serious_python) và Flet 0.21 -> 0.25+ (PC)
-- Đã sửa lỗi AttributeError: module 'flet' has no attribute 'app' (tự chuyển sang ft.run)
-- Đã đồng bộ FilePicker & Share Service cho cả Android (async services) và Windows (overlay)
-- Giao diện Mobile chuẩn ngón cái: Bottom Action Bar, Contextual Bar, Studio 3 Tab gọn gàng
-- Đầy đủ 10 tính năng:
-  1. Nén PDF tự động theo dung lượng mục tiêu (dưới X MB)
-  2. Thùng rác thông minh (lưu 7 ngày, khôi phục tài liệu & trang lẻ)
-  3. Cảnh báo ảnh mờ / thiếu sáng ngay khi chụp hoặc tải lên
-  4. Sao lưu & Khôi phục toàn bộ dữ liệu ra file .zip
-  5. Đóng dấu chữ mờ (Watermark) hỗ trợ tiếng Việt (Pillow / OpenCV fallback)
-  6. Màn hình che thông tin nhạy cảm (Vẽ ô đen / Làm mờ Pixel / Xóa trắng, chạm vào ô để xóa)
-  7. Ghép 2, 4 hoặc 6 ảnh vào 1 trang A4 chuẩn
-  8. Tách nền chữ ký tự động & Kéo thả vị trí trực quan
-  9. Quản lý Thư mục (Folder), Tìm kiếm & Sắp xếp tài liệu
-  10. Chụp trực tiếp từ Camera trong app (hoặc chuyển sang Camera hệ thống trên Android)
+CS Scanner Pro V6.5 - Android APK & Mobile UI Edition
+- Đã cấu hình chuẩn cho Flet >= 0.70 (path = "src", pyproject.toml có quyền CAMERA)
+- Trên Android: Mở trình chọn Hệ thống có nút Máy ảnh (Camera) gốc siêu nét + Bộ sưu tập
+- Trên Windows PC: Mở trực tiếp Live Webcam với khung xanh nhận diện 4 góc giấy
+- Đầy đủ 10 tính năng: Nén PDF theo MB, Thùng rác 7 ngày, Cảnh báo ảnh mờ/tối,
+  Sao lưu/Khôi phục .ZIP, Đóng dấu Watermark tiếng Việt (Pillow), Che thông tin nhạy cảm,
+  Ghép 2/4/6 mặt vào 1 trang A4, Tách nền & Chèn chữ ký, Thư mục & Tìm kiếm.
 """
 import base64
 import json
@@ -494,10 +485,11 @@ def apply_signatures(img, signatures):
 
 def _find_system_font():
     cands = [
+        "/system/fonts/Roboto-Regular.ttf",
+        "/system/fonts/DroidSans.ttf",
         "C:/Windows/Fonts/arial.ttf",
         "C:/Windows/Fonts/segoeui.ttf",
         "C:/Windows/Fonts/tahoma.ttf",
-        "/system/fonts/Roboto-Regular.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/Library/Fonts/Arial.ttf",
     ]
@@ -1121,7 +1113,7 @@ def compose_multi_grid_a4(imgs, layout=2, dpi=200):
 # 6. GIAO DIỆN ĐIỆN THOẠI (MOBILE-FIRST UI)
 # =====================================================================
 def main(page: ft.Page):
-    page.title = "CS Scanner Pro V6.4"
+    page.title = "CS Scanner Pro V6.5"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
     page.bgcolor = "#EEF2F5"
@@ -1131,6 +1123,14 @@ def main(page: ft.Page):
     except Exception:
         pass
 
+    # Nhận diện môi trường Điện thoại Android / iOS
+    IS_MOBILE_OS = (
+        str(getattr(page, "platform", "")).lower().endswith(("android", "ios"))
+        or "ANDROID_ARGUMENT" in os.environ
+        or "FLET_APP_STORAGE_DATA" in os.environ
+        or os.path.isdir("/storage/emulated/0")
+    )
+
     CS_TEAL, CS_DARK, CS_ACCENT, CS_ORANGE = "#00897B", "#182026", "#00BFA5", "#E65100"
     WHITE = Colors.WHITE
 
@@ -1139,7 +1139,7 @@ def main(page: ft.Page):
         "trash": [],
         "current_doc_idx": -1,
         "active_page_idx": 0,
-        "studio_tab": "color",  # color | crop | secure
+        "studio_tab": "color",
         "crop_target_idx": -1,
         "crop_raw": None,
         "crop_disp": None,
@@ -1188,7 +1188,7 @@ def main(page: ft.Page):
             ], spacing=3, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
         )
 
-    # ---------- Thông báo / Hộp thoại (Tương thích cả Flet 0.21, 0.25 và 0.70+) ----------
+    # ---------- Thông báo / Hộp thoại ----------
     def toast(msg, color=CS_TEAL):
         sb = ft.SnackBar(content=ft.Text(msg, color=WHITE, weight=ft.FontWeight.BOLD, size=13),
                          bgcolor=color, duration=2800)
@@ -1594,7 +1594,7 @@ def main(page: ft.Page):
         open_dlg(dlg)
 
     # =================================================================
-    # MÀN HÌNH XEM TRƯỚC TOÀN MÀN HÌNH (FULLSCREEN INSPECT)
+    # MÀN HÌNH XEM TRƯỚC TOÀN MÀN HÌNH
     # =================================================================
     pv = {"idx": 0, "compare": False}
     pv_holder = ft.Container(expand=True, bgcolor="#0D1214", alignment=ALIGN_CENTER)
@@ -1659,7 +1659,7 @@ def main(page: ft.Page):
         pv_goto(p_idx)
 
     # =================================================================
-    # MÀN HÌNH 1: TRANG CHỦ ĐIỆN THOẠI (BOTTOM ACTION BAR + CONTEXT BAR)
+    # MÀN HÌNH 1: TRANG CHỦ ĐIỆN THOẠI
     # =================================================================
     docs_list_col = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
 
@@ -2293,7 +2293,7 @@ def main(page: ft.Page):
                 ], spacing=6),
             ], spacing=6, tight=True)
 
-        else:  # secure
+        else:
             studio_tab_body.content = ft.Column([
                 ft.Row([
                     mobile_action_tile(Icons.VISIBILITY_OFF, "Che CCCD/TK",
@@ -2925,9 +2925,74 @@ def main(page: ft.Page):
         page.update()
 
     # =================================================================
-    # MÀN HÌNH 6: CAMERA ĐIỆN THOẠI (NÚT SHUTTER TRÒN LỚN Ở GIỮA ĐÁY)
+    # MÀN HÌNH 6: CAMERA TRÊN ĐIỆN THOẠI ANDROID & LIVE WEBCAM TRÊN PC
     # =================================================================
+    def open_android_camera_sheet(new_doc=True, auto_crop=True, folder="Chung", mode="doc"):
+        """
+        Trên Android, gọi FilePickerFileType.ANY sẽ mở trình DocumentsUI gốc của hệ thống
+        có sẵn biểu tượng '📷 Máy ảnh (Camera)' để chụp trực tiếp bằng Camera gốc của điện thoại.
+        """
+        def trigger_cam_intent(use_any_type):
+            close_dlg(bs_cam)
+            if mode == "sig":
+                app_data["picker_mode"] = "import_sig"
+                pick_files_generic(
+                    allow_multiple=False,
+                    file_type=ft.FilePickerFileType.ANY if use_any_type else ft.FilePickerFileType.IMAGE,
+                )
+            else:
+                import_state["new_doc"] = new_doc
+                import_state["auto"] = auto_crop
+                import_state["folder"] = folder
+                app_data["picker_mode"] = "import_images"
+                pick_files_generic(
+                    allow_multiple=True,
+                    file_type=ft.FilePickerFileType.ANY if use_any_type else ft.FilePickerFileType.IMAGE,
+                )
+
+        bs_cam = ft.BottomSheet(
+            ft.Container(
+                padding=18, bgcolor=WHITE, border_radius=16,
+                content=ft.Column([
+                    ft.Text("📸 Chụp Quét Tài Liệu", weight=ft.FontWeight.BOLD, size=16, color=CS_DARK),
+                    ft.Text(
+                        "Mẹo trên Android: Khi bảng hệ thống hiện ra, bấm vào biểu tượng '📷 Máy ảnh (Camera)' để chụp nét nhất, hoặc chọn ngay các ảnh vừa chụp.",
+                        size=12, color="#455A64",
+                    ),
+                    ft.Container(
+                        bgcolor="#FFF3E0", border_radius=12, padding=12,
+                        border=border_all(1.5, CS_ORANGE),
+                        on_click=lambda _: trigger_cam_intent(True),
+                        content=ft.Row([
+                            ft.Icon(Icons.PHOTO_CAMERA, color=CS_ORANGE, size=30),
+                            ft.Column([
+                                ft.Text("Mở Máy ảnh / Tệp hệ thống (Có nút 📷 Camera)", weight=ft.FontWeight.BOLD, size=13, color=CS_ORANGE),
+                                ft.Text("Chọn 'Máy ảnh' trên màn hình kế tiếp để chụp trực tiếp", size=11, color="#455A64"),
+                            ], spacing=2, expand=True),
+                        ], spacing=10),
+                    ),
+                    ft.Container(
+                        bgcolor="#E0F2F1", border_radius=12, padding=12,
+                        on_click=lambda _: trigger_cam_intent(False),
+                        content=ft.Row([
+                            ft.Icon(Icons.COLLECTIONS, color=CS_TEAL, size=28),
+                            ft.Column([
+                                ft.Text("Mở nhanh Bộ sưu tập Ảnh gần đây", weight=ft.FontWeight.BOLD, size=13, color=CS_TEAL),
+                                ft.Text("Chọn 1 hoặc nhiều ảnh tài liệu đã chụp", size=11, color="#455A64"),
+                            ], spacing=2, expand=True),
+                        ], spacing=10),
+                    ),
+                ], tight=True, spacing=10),
+            )
+        )
+        open_dlg(bs_cam)
+
     def open_camera_screen(new_doc=True, auto_crop=True, folder="Chung", mode="doc"):
+        # Trên Android / iOS: dùng thẳng trình Máy ảnh hệ thống để không bị lỗi đen màn hình cv2.VideoCapture
+        if IS_MOBILE_OS:
+            open_android_camera_sheet(new_doc=new_doc, auto_crop=auto_crop, folder=folder, mode=mode)
+            return
+
         page.floating_action_button = None
         app_data["cam_running"] = True
 
@@ -2987,15 +3052,7 @@ def main(page: ft.Page):
 
         def fallback_system_picker(_=None):
             release_cam()
-            if mode == "sig":
-                app_data["picker_mode"] = "import_sig"
-                pick_files_generic(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
-            else:
-                import_state["new_doc"] = new_doc
-                import_state["auto"] = auto_crop
-                import_state["folder"] = folder
-                app_data["picker_mode"] = "import_images"
-                pick_files_generic(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
+            open_android_camera_sheet(new_doc=new_doc, auto_crop=auto_crop, folder=folder, mode=mode)
 
         def refresh_captured_strip():
             captured_strip.controls.clear()
@@ -3125,7 +3182,7 @@ def main(page: ft.Page):
 
             if cap is None:
                 cam_status_txt.value = "📱 Chế độ Máy ảnh Hệ thống"
-                cam_quality_txt.value = "Bấm nút tròn màu cam bên dưới để mở Máy ảnh / Thư viện của thiết bị"
+                cam_quality_txt.value = "Bấm nút tròn màu cam bên dưới để mở Máy ảnh / Thư viện"
                 try:
                     page.update()
                 except Exception:
@@ -3376,7 +3433,6 @@ def main(page: ft.Page):
         else:
             handle_import_images(paths)
 
-    # Khởi tạo FilePicker tương thích cả Flet 0.2x (overlay) và Flet 0.70+ (services async)
     old_picker = None
     new_picker = None
 
@@ -3397,18 +3453,18 @@ def main(page: ft.Page):
         page.overlay.append(old_picker)
 
     async def _pick_new_async(allow_multiple, file_type, allowed_extensions):
-        picker = new_picker or ft.FilePicker()
-        if hasattr(page, "services") and picker not in page.services:
-            try:
+        try:
+            picker = new_picker or ft.FilePicker()
+            if hasattr(page, "services") and picker not in page.services:
                 page.services.append(picker)
-            except Exception:
-                pass
-        kw = {"allow_multiple": allow_multiple, "file_type": file_type}
-        if allowed_extensions:
-            kw["allowed_extensions"] = allowed_extensions
-        files = await picker.pick_files(**kw)
-        if files:
-            dispatch_picked_files([f.path for f in files if getattr(f, "path", None)])
+            kw = {"allow_multiple": allow_multiple, "file_type": file_type}
+            if allowed_extensions:
+                kw["allowed_extensions"] = allowed_extensions
+            files = await picker.pick_files(**kw)
+            if files:
+                dispatch_picked_files([f.path for f in files if getattr(f, "path", None)])
+        except Exception as ex:
+            toast(f"❌ Lỗi mở trình chọn tệp: {ex}", Colors.RED_700)
 
     def pick_files_generic(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE, allowed_extensions=None):
         if NEW_FLET:
