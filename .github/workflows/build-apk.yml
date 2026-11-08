@@ -25,47 +25,50 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Lưu đệm (Cache) Gradle & Flutter để tránh lỗi mạng 504
+      - name: Lưu đệm (Cache) Gradle & Flutter để build nhanh và tránh lỗi 504
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/wrapper
             ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-cache-v1
+            ~/flutter
+          key: ${{ runner.os }}-flet-gradle-cache-v2
 
-      - name: Tải sẵn Gradle bằng curl (Có tự động thử lại nếu lỗi 504)
+      - name: Cấu hình Timeout cho Gradle
         run: |
           mkdir -p ~/.gradle/wrapper/dists
-          # Tăng thời gian chờ mạng cho Gradle Wrapper
           export JAVA_TOOL_OPTIONS="-Dorg.gradle.internal.http.connectionTimeout=180000 -Dorg.gradle.internal.http.socketTimeout=180000"
           echo "JAVA_TOOL_OPTIONS=$JAVA_TOOL_OPTIONS" >> $GITHUB_ENV
 
       - name: Chấp nhận giấy phép Android SDK
         run: |
+          set +o pipefail
           SDKM="${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager"
-          if [ -x "$SDKM" ]; then yes | "$SDKM" --licenses > /dev/null || true; fi
+          if [ -x "$SDKM" ]; then yes | "$SDKM" --licenses > /dev/null 2>&1 || true; fi
 
       - name: Cài Flet
         run: pip install -U flet
 
-      - name: Build APK (Tự động thử lại tối đa 3 lần nếu nghẽn mạng)
+      - name: Build APK (Có tự động trả lời Yes & thử lại nếu nghẽn mạng)
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUNBUFFERED: "1"
           CI: "true"
         run: |
+          set +o pipefail
           for i in 1 2 3; do
             echo "=== Lần thử build thứ $i ==="
-            # Nếu lần trước tạo ra file gradle-url hướng về github bị lỗi 504, đổi sang CDN chính của Gradle
-            find ~/.flutter /tmp build -name "gradle-wrapper.properties" 2>/dev/null | while read prop; do
-              sed -i 's|https\\://github.com/gradle/gradle-distributions/releases/download/v\([0-9.]*\)/|https\\://services.gradle.org/distributions/|g' "$prop" || true
+            # Đổi link tải Gradle từ GitHub sang CDN chính thức của Gradle nếu có file properties
+            find /home/runner /tmp build -name "gradle-wrapper.properties" 2>/dev/null | while read prop; do
+              sed -i 's|https\\://github.com/gradle/gradle-distributions/releases/download/v[^/]*/|https\\://services.gradle.org/distributions/|g' "$prop" 2>/dev/null || true
             done
 
-            if flet build apk --verbose --no-rich-output; then
+            # Truyền cờ --yes (và dự phòng yes | với set +o pipefail để không bao giờ lỗi Broken pipe)
+            if yes | flet build apk --yes --verbose --no-rich-output; then
               echo "✅ Build APK thành công!"
               exit 0
             fi
-            echo "⚠️ Lần thử $i thất bại (do nghẽn mạng), đợi 15 giây rồi thử lại..."
+            echo "⚠️ Lần thử $i thất bại, đợi 15 giây rồi thử lại..."
             sleep 15
           done
           exit 1
