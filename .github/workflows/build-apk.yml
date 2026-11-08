@@ -3,7 +3,7 @@ name: Build APK
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # cho phép bấm nút chạy tay trên tab Actions
+  workflow_dispatch:
 
 jobs:
   build:
