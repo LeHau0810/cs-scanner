@@ -1,10 +1,20 @@
 """
-CS Scanner Pro V6.3 - Mobile UI Edition (Tối ưu bố cục chuẩn Điện thoại)
-- Bố cục Mobile hiện đại: Thanh điều hướng đáy (Bottom Bar), 100% thao tác bằng 1 ngón cái
-- Màn hình Studio chia 3 Tab gọn gàng (Màu & Sáng | Cắt & Xoay | Bảo mật & Ghép) - không phải cuộn dài
-- Thanh công cụ ngữ cảnh ở Trang chủ: chỉ hiện khi tích chọn tài liệu
-- Màn hình Camera chuẩn điện thoại với nút chụp tròn lớn ở giữa đáy
-- Giữ nguyên toàn bộ 10 tính năng cao cấp & bản vá ổn định của V6.2
+CS Scanner Pro V6.4 - Mobile UI & Android APK Ready Edition
+- Tương thích hoàn toàn Flet 0.70+ (Android APK / serious_python) và Flet 0.21 -> 0.25+ (PC)
+- Đã sửa lỗi AttributeError: module 'flet' has no attribute 'app' (tự chuyển sang ft.run)
+- Đã đồng bộ FilePicker & Share Service cho cả Android (async services) và Windows (overlay)
+- Giao diện Mobile chuẩn ngón cái: Bottom Action Bar, Contextual Bar, Studio 3 Tab gọn gàng
+- Đầy đủ 10 tính năng:
+  1. Nén PDF tự động theo dung lượng mục tiêu (dưới X MB)
+  2. Thùng rác thông minh (lưu 7 ngày, khôi phục tài liệu & trang lẻ)
+  3. Cảnh báo ảnh mờ / thiếu sáng ngay khi chụp hoặc tải lên
+  4. Sao lưu & Khôi phục toàn bộ dữ liệu ra file .zip
+  5. Đóng dấu chữ mờ (Watermark) hỗ trợ tiếng Việt (Pillow / OpenCV fallback)
+  6. Màn hình che thông tin nhạy cảm (Vẽ ô đen / Làm mờ Pixel / Xóa trắng, chạm vào ô để xóa)
+  7. Ghép 2, 4 hoặc 6 ảnh vào 1 trang A4 chuẩn
+  8. Tách nền chữ ký tự động & Kéo thả vị trí trực quan
+  9. Quản lý Thư mục (Folder), Tìm kiếm & Sắp xếp tài liệu
+  10. Chụp trực tiếp từ Camera trong app (hoặc chuyển sang Camera hệ thống trên Android)
 """
 import base64
 import json
@@ -32,12 +42,13 @@ except ImportError:
     HAS_PIL = False
 
 # =====================================================================
-# 0. LỚP TƯƠNG THÍCH FLET MỌI PHIÊN BẢN
+# 0. LỚP TƯƠNG THÍCH FLET MỌI PHIÊN BẢN (0.2x -> 0.70+)
 # =====================================================================
 Colors = getattr(ft, "Colors", None) or getattr(ft, "colors", None)
 Icons = getattr(ft, "Icons", None) or getattr(ft, "icons", None)
 FIT = getattr(ft, "BoxFit", None) or getattr(ft, "ImageFit", None)
 IMG_OLD = hasattr(ft.Image, "src_base64")
+NEW_FLET = hasattr(ft, "Service") or not hasattr(ft, "app")
 DDOpt = getattr(ft, "DropdownOption", None) or ft.dropdown.Option
 
 
@@ -247,7 +258,7 @@ def fit_max(img, max_side: int = 1600):
 
 
 def _download_dir():
-    for d in (os.path.join(os.path.expanduser("~"), "Downloads"), "/storage/emulated/0/Download"):
+    for d in ("/storage/emulated/0/Download", os.path.join(os.path.expanduser("~"), "Downloads")):
         if os.path.isdir(d) and os.access(d, os.W_OK):
             return d
     return None
@@ -1110,11 +1121,10 @@ def compose_multi_grid_a4(imgs, layout=2, dpi=200):
 # 6. GIAO DIỆN ĐIỆN THOẠI (MOBILE-FIRST UI)
 # =====================================================================
 def main(page: ft.Page):
-    page.title = "CS Scanner Pro V6.3"
+    page.title = "CS Scanner Pro V6.4"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
     page.bgcolor = "#EEF2F5"
-    # Kích thước khung chuẩn tỷ lệ màn hình điện thoại (20:9) khi mở trên máy tính
     try:
         page.window.width = 430
         page.window.height = 880
@@ -1162,7 +1172,6 @@ def main(page: ft.Page):
     def cur_doc():
         return app_data["docs"][app_data["current_doc_idx"]]
 
-    # Helper tạo nút bấm dạng ô (Tile Button) chuẩn Mobile dễ bấm bằng ngón cái
     def mobile_action_tile(icon_name, label, on_tap, bg="#F5F7F9", fg="#263238", icon_col=CS_TEAL, expand_tile=True):
         return ft.Container(
             expand=expand_tile,
@@ -1179,13 +1188,19 @@ def main(page: ft.Page):
             ], spacing=3, tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
         )
 
-    # ---------- Thông báo / Hộp thoại ----------
+    # ---------- Thông báo / Hộp thoại (Tương thích cả Flet 0.21, 0.25 và 0.70+) ----------
     def toast(msg, color=CS_TEAL):
         sb = ft.SnackBar(content=ft.Text(msg, color=WHITE, weight=ft.FontWeight.BOLD, size=13),
                          bgcolor=color, duration=2800)
         if hasattr(page, "open"):
             try:
                 page.open(sb)
+                return
+            except Exception:
+                pass
+        if hasattr(page, "show_dialog"):
+            try:
+                page.show_dialog(sb)
                 return
             except Exception:
                 pass
@@ -1200,6 +1215,12 @@ def main(page: ft.Page):
                 return
             except Exception:
                 pass
+        if hasattr(page, "show_dialog"):
+            try:
+                page.show_dialog(dlg)
+                return
+            except Exception:
+                pass
         if dlg not in page.overlay:
             page.overlay.append(dlg)
         dlg.open = True
@@ -1209,6 +1230,12 @@ def main(page: ft.Page):
         if hasattr(page, "close"):
             try:
                 page.close(dlg)
+                return
+            except Exception:
+                pass
+        if hasattr(page, "pop_dialog"):
+            try:
+                page.pop_dialog()
                 return
             except Exception:
                 pass
@@ -1267,6 +1294,16 @@ def main(page: ft.Page):
 
         threading.Thread(target=_t, daemon=True).start()
 
+    # ---------- Chia sẻ trên Android (Flet 0.70+ Share Service) hoặc Mở thư mục trên Windows ----------
+    share_svc = None
+    if hasattr(ft, "Share"):
+        try:
+            share_svc = ft.Share()
+            if hasattr(page, "services"):
+                page.services.append(share_svc)
+        except Exception:
+            share_svc = None
+
     def share_or_reveal_files(paths):
         if not paths:
             return
@@ -1278,6 +1315,28 @@ def main(page: ft.Page):
                 return
             except Exception:
                 pass
+
+        if share_svc is not None and hasattr(ft, "ShareFile"):
+            tmp = os.path.join(os.environ.get("FLET_APP_STORAGE_TEMP") or tempfile.gettempdir(), "cs_share")
+
+            async def _do_share():
+                try:
+                    os.makedirs(tmp, exist_ok=True)
+                    s_files = []
+                    for p in paths:
+                        dst = os.path.join(tmp, os.path.basename(p))
+                        shutil.copyfile(p, dst)
+                        s_files.append(ft.ShareFile.from_path(dst))
+                    await share_svc.share_files(s_files, text="Tài liệu scan từ CS Scanner Pro")
+                except Exception:
+                    toast(f"✅ Đã lưu tại: {first_path}", CS_TEAL)
+
+            try:
+                page.run_task(_do_share)
+                return
+            except Exception:
+                pass
+
         toast(f"✅ Đã lưu tại: {first_path}", CS_TEAL)
 
     # ---------- Đổi tên & Đổi Thư mục ----------
@@ -1325,7 +1384,8 @@ def main(page: ft.Page):
             toast("⚠️ Không có trang nào để xuất!", Colors.ORANGE_800)
             return
         ext = ".pdf" if fmt == "pdf" else ".jpg"
-        tf = ft.TextField(value=default_name, label=f"Tên file ({ext})", autofocus=True, suffix_text=ext)
+        tf = ft.TextField(value=default_name, label=f"Tên file ({ext})", autofocus=True,
+                          **({"suffix": ext} if NEW_FLET else {"suffix_text": ext}))
         dd_q = ft.Dropdown(label="Chất lượng", value="mid", options=[
             DDOpt(key="low", text="Nhỏ gọn · 150 DPI (Zalo/Email)"),
             DDOpt(key="mid", text="Cân bằng · 200 DPI"),
@@ -1351,7 +1411,7 @@ def main(page: ft.Page):
             controls.extend([dd_p, tf_mb, quick_mb_row])
         controls.append(ft.Text(f"Tổng cộng: {len(pages)} trang", size=11, color="#546E7A"))
 
-        def do(open_folder_after):
+        def do(share_after):
             name = (tf.value or "").strip()
             if not name:
                 tf.error_text = "Hãy nhập tên file"
@@ -1374,7 +1434,7 @@ def main(page: ft.Page):
 
             def done(paths):
                 mb = sum(os.path.getsize(p) for p in paths) / 1048576.0
-                if open_folder_after:
+                if share_after:
                     share_or_reveal_files(paths)
                 else:
                     toast(f"✅ Đã lưu ({mb:.2f} MB): {os.path.basename(paths[0])}")
@@ -1387,7 +1447,7 @@ def main(page: ft.Page):
             content=ft.Column(controls, tight=True, spacing=6),
             actions=[ft.TextButton("Hủy", on_click=lambda _: close_dlg(dlg)),
                      OutBtn("💾 Lưu", on_click=lambda _: do(False)),
-                     Btn("📂 Lưu & Mở", bgcolor=CS_TEAL, color=WHITE, on_click=lambda _: do(True))],
+                     Btn("📤 Lưu & Chia sẻ", bgcolor=CS_TEAL, color=WHITE, on_click=lambda _: do(True))],
             actions_alignment=ft.MainAxisAlignment.END)
         open_dlg(dlg)
 
@@ -1516,7 +1576,7 @@ def main(page: ft.Page):
         def do_restore(_):
             close_dlg(dlg)
             app_data["picker_mode"] = "restore_zip"
-            pick_files_generic(allow_multiple=False, file_type=ft.FilePickerFileType.CUSTOM, allowed_extensions=["zip"])
+            pick_files_generic(allow_multiple=False, file_type=ft.FilePickerFileType.ANY)
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -1540,7 +1600,7 @@ def main(page: ft.Page):
     pv_holder = ft.Container(expand=True, bgcolor="#0D1214", alignment=ALIGN_CENTER)
     pv_img = make_img(fit=FIT.CONTAIN)
     pv_title = ft.Text("", color=WHITE, size=14, weight=ft.FontWeight.BOLD, expand=True)
-    pv_compare_btn = OutBtn("👁 Giữ/Bấm xem Ảnh Gốc")
+    pv_compare_btn = OutBtn("👁 So sánh Ảnh Gốc")
 
     def render_preview_b64(pg, compare):
         warped = fit_max(get_warped(pg), 1500)
@@ -1753,7 +1813,6 @@ def main(page: ft.Page):
             ],
         )
 
-        # Thanh ngữ cảnh chỉ hiện khi người dùng tích chọn >= 1 tài liệu
         selection_bar = ft.Container(
             visible=(sel_count > 0),
             bgcolor="#E0F2F1",
@@ -1764,7 +1823,7 @@ def main(page: ft.Page):
                     ft.TextButton("Tất cả", on_click=lambda _: toggle_all_docs(True)),
                     ft.TextButton("Bỏ", on_click=lambda _: toggle_all_docs(False)),
                     ft.IconButton(Icons.AUTO_FIX_HIGH, icon_color=CS_TEAL, tooltip="Chỉnh sáng loạt", on_click=open_batch_dialog),
-                    ft.IconButton(Icons. CALL_MERGE, icon_color="#3949AB", tooltip="Gộp tài liệu", on_click=merge_selected_docs),
+                    ft.IconButton(Icons.CALL_MERGE, icon_color="#3949AB", tooltip="Gộp tài liệu", on_click=merge_selected_docs),
                     ft.IconButton(Icons.PICTURE_AS_PDF, icon_color="#D84315", tooltip="Xuất PDF", on_click=export_selected_docs_pdf),
                     ft.IconButton(Icons.DELETE_OUTLINE, icon_color=Colors.RED_600, tooltip="Xóa", on_click=delete_selected_docs),
                 ], spacing=0),
@@ -1841,7 +1900,6 @@ def main(page: ft.Page):
 
         refresh_doc_cards_only()
 
-        # Thanh nút bấm cố định dưới đáy màn hình điện thoại (Bottom Bar)
         bottom_action_bar = ft.Container(
             bgcolor=WHITE,
             padding=pad_sym(12, 8),
@@ -1875,7 +1933,6 @@ def main(page: ft.Page):
         )
 
         root_body.content = ft.Column([
-            # Header gọn gàng
             ft.Container(bgcolor=CS_TEAL, padding=pad_sym(14, 10), content=ft.Row([
                 ft.Row([
                     ft.Icon(Icons.DOCUMENT_SCANNER, color=WHITE, size=22),
@@ -1889,19 +1946,15 @@ def main(page: ft.Page):
                 ], spacing=0),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)),
 
-            # Thanh tìm kiếm + Bộ lọc Thư mục
             ft.Container(bgcolor=WHITE, padding=pad_sym(10, 8), content=ft.Column([
                 ft.Row([search_tf, sort_menu], spacing=2),
                 folder_bar,
             ], spacing=8, tight=True)),
 
-            # Thanh thao tác hàng loạt (chỉ hiện khi có tích chọn)
             selection_bar,
 
-            # Danh sách tài liệu ở giữa
             ft.Container(padding=pad_sym(10, 4), expand=True, content=docs_list_col),
 
-            # Thanh tác vụ ngón cái dưới đáy
             bottom_action_bar,
         ], expand=True, spacing=0)
         page.update()
@@ -2341,7 +2394,6 @@ def main(page: ft.Page):
         refresh_studio_ui()
 
         root_body.content = ft.Column(expand=True, spacing=0, controls=[
-            # 1. Thanh tiêu đề Studio
             ft.Container(bgcolor=CS_TEAL, padding=pad_sym(6, 6), content=ft.Row([
                 ft.IconButton(Icons.ARROW_BACK, icon_color=WHITE, on_click=lambda _: render_home_view()),
                 ft.Container(
@@ -2374,7 +2426,6 @@ def main(page: ft.Page):
 
             quality_alert_banner,
 
-            # 2. Khung xem trang lớn ở trung tâm (có nút nổi Hoàn tác & Phóng to)
             ft.Container(
                 expand=True,
                 bgcolor="#1E272C",
@@ -2410,7 +2461,6 @@ def main(page: ft.Page):
                 ], expand=True),
             ),
 
-            # 3. Dải Filmstrip các trang + Nút thêm nhanh
             ft.Container(
                 bgcolor=WHITE,
                 padding=pad_sym(8, 4),
@@ -2438,7 +2488,6 @@ def main(page: ft.Page):
                 ], spacing=2, tight=True),
             ),
 
-            # 4. Bảng công cụ đáy chia 3 Tab chuẩn Mobile
             ft.Container(
                 bgcolor=WHITE,
                 padding=pad_sym(8, 4),
@@ -2451,7 +2500,7 @@ def main(page: ft.Page):
         page.update()
 
     # =================================================================
-    # MÀN HÌNH 3: KÉO 4 GÓC THỦ CÔNG (CHUẨN KHUNG MOBILE)
+    # MÀN HÌNH 3: KÉO 4 GÓC THỦ CÔNG
     # =================================================================
     MAX_CROP_W, MAX_CROP_H = 350, 450
     crop_bg_image = make_img(width=MAX_CROP_W, height=MAX_CROP_H, fit=FIT.FILL)
@@ -2557,7 +2606,7 @@ def main(page: ft.Page):
         page.update()
 
     # =================================================================
-    # MÀN HÌNH 4: CHE THÔNG TIN NHẠY CẢM (MOBILE TOUCH OPTIMIZED)
+    # MÀN HÌNH 4: CHE THÔNG TIN NHẠY CẢM
     # =================================================================
     def open_redact_screen(p_idx):
         doc = cur_doc()
@@ -2754,7 +2803,7 @@ def main(page: ft.Page):
         redraw()
 
     # =================================================================
-    # MÀN HÌNH 5: TÁCH NỀN & CHÈN CHỮ KÝ (MOBILE TOUCH)
+    # MÀN HÌNH 5: TÁCH NỀN & CHÈN CHỮ KÝ
     # =================================================================
     def list_saved_signatures():
         if not os.path.isdir(SIG_DIR):
@@ -2901,7 +2950,7 @@ def main(page: ft.Page):
         cam_status_txt = ft.Text("⏳ Đang mở Camera...", color="#A7FFEB", size=12, weight=ft.FontWeight.BOLD)
         cam_quality_txt = ft.Text("", color="#FFE082", size=11, weight=ft.FontWeight.BOLD)
         captured_strip = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=6, height=62)
-        done_badge_txt = ft.Text("Xong (0)", color=WHITE, weight=ft.FontWeight.BOLD, size=13)
+        done_badge_txt = ft.Text("Lưu (0) ✓", color=WHITE, weight=ft.FontWeight.BOLD, size=13)
 
         def release_cam():
             app_data["cam_running"] = False
@@ -2921,17 +2970,32 @@ def main(page: ft.Page):
                 except Exception:
                     pass
             cap = None
-            if os.name == "nt" and hasattr(cv2, "CAP_DSHOW"):
-                cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-                if not cap or not cap.isOpened():
+            try:
+                if os.name == "nt" and hasattr(cv2, "CAP_DSHOW"):
+                    cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+                    if not cap or not cap.isOpened():
+                        cap = cv2.VideoCapture(idx)
+                else:
                     cap = cv2.VideoCapture(idx)
-            else:
-                cap = cv2.VideoCapture(idx)
-            if cap and cap.isOpened():
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-                return cap
+                if cap and cap.isOpened():
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+                    return cap
+            except Exception:
+                pass
             return None
+
+        def fallback_system_picker(_=None):
+            release_cam()
+            if mode == "sig":
+                app_data["picker_mode"] = "import_sig"
+                pick_files_generic(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
+            else:
+                import_state["new_doc"] = new_doc
+                import_state["auto"] = auto_crop
+                import_state["folder"] = folder
+                app_data["picker_mode"] = "import_images"
+                pick_files_generic(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE)
 
         def refresh_captured_strip():
             captured_strip.controls.clear()
@@ -2973,7 +3037,7 @@ def main(page: ft.Page):
         def snap_photo(_=None):
             raw = cam_state.get("last_raw")
             if raw is None:
-                toast("⚠️ Chưa có tín hiệu Camera!", Colors.ORANGE_800)
+                fallback_system_picker()
                 return
             frame_copy = raw.copy()
 
@@ -3060,8 +3124,8 @@ def main(page: ft.Page):
             cam_state["cap"] = cap
 
             if cap is None:
-                cam_status_txt.value = "❌ Không tìm thấy Camera!"
-                cam_quality_txt.value = "Hãy dùng tính năng 'Tải Ảnh Lên'"
+                cam_status_txt.value = "📱 Chế độ Máy ảnh Hệ thống"
+                cam_quality_txt.value = "Bấm nút tròn màu cam bên dưới để mở Máy ảnh / Thư viện của thiết bị"
                 try:
                     page.update()
                 except Exception:
@@ -3145,7 +3209,6 @@ def main(page: ft.Page):
 
             release_cam()
 
-        # Giao diện Camera chuẩn Điện thoại: Nút chụp tròn lớn 72px ở đáy
         shutter_button = ft.GestureDetector(
             on_tap=snap_photo,
             content=ft.Container(
@@ -3158,7 +3221,6 @@ def main(page: ft.Page):
         )
 
         root_body.content = ft.Container(bgcolor="#0B0F12", expand=True, content=ft.Column([
-            # Top Camera Bar
             ft.Container(padding=pad_sym(8, 6), bgcolor="#11171A", content=ft.Row([
                 ft.IconButton(Icons.CLOSE, icon_color=WHITE, on_click=cancel_camera),
                 ft.Column([cam_status_txt, cam_quality_txt], spacing=1, expand=True,
@@ -3169,13 +3231,10 @@ def main(page: ft.Page):
                               on_click=lambda _: cam_state.update({"mirror": not cam_state["mirror"]})),
             ])),
 
-            # Kính ngắm Camera chiếm trọn phần giữa
             ft.Container(expand=True, alignment=ALIGN_CENTER, content=cam_view_img),
 
-            # Dải trang vừa chụp
             ft.Container(padding=pad_sym(10, 2), content=captured_strip) if mode == "doc" else ft.Container(),
 
-            # Cụm điều khiển đáy chuẩn máy ảnh điện thoại
             ft.Container(
                 bgcolor="#11171A",
                 padding=pad_sym(18, 12),
@@ -3184,7 +3243,7 @@ def main(page: ft.Page):
                         width=86, height=42, border_radius=21, bgcolor="#263238",
                         alignment=ALIGN_CENTER, on_click=switch_camera,
                         content=ft.Row([
-                            ft.Icon(Icons.cameraswitch if hasattr(Icons, "cameraswitch") else Icons.REFRESH, color=WHITE, size=18),
+                            ft.Icon(Icons.REFRESH, color=WHITE, size=18),
                             ft.Text("Đổi Cam", color=WHITE, size=12, weight=ft.FontWeight.BOLD),
                         ], alignment=ft.MainAxisAlignment.CENTER, spacing=4),
                     ),
@@ -3203,7 +3262,7 @@ def main(page: ft.Page):
         threading.Thread(target=camera_loop, daemon=True).start()
 
     # =================================================================
-    # 7. TẢI ẢNH LÊN & HỆ THỐNG FILE PICKER
+    # 7. TẢI ẢNH LÊN & HỆ THỐNG FILE PICKER ĐA NỀN TẢNG (0.2x + 0.70+ APK)
     # =================================================================
     import_state = {"new_doc": True, "auto": True, "order": "name", "reverse": False, "folder": "Chung"}
 
@@ -3317,25 +3376,48 @@ def main(page: ft.Page):
         else:
             handle_import_images(paths)
 
-    def on_picker_result(e):
-        files = getattr(e, "files", None)
-        if files:
-            dispatch_picked_files([f.path for f in files if getattr(f, "path", None)])
+    # Khởi tạo FilePicker tương thích cả Flet 0.2x (overlay) và Flet 0.70+ (services async)
+    old_picker = None
+    new_picker = None
 
-    file_picker = ft.FilePicker(on_result=on_picker_result)
-    page.overlay.append(file_picker)
+    if NEW_FLET:
+        try:
+            new_picker = ft.FilePicker()
+            if hasattr(page, "services"):
+                page.services.append(new_picker)
+        except Exception:
+            new_picker = None
+    else:
+        def on_old_picker_result(e):
+            files = getattr(e, "files", None)
+            if files:
+                dispatch_picked_files([f.path for f in files if getattr(f, "path", None)])
 
-    def pick_files_generic(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE, allowed_extensions=None):
+        old_picker = ft.FilePicker(on_result=on_old_picker_result)
+        page.overlay.append(old_picker)
+
+    async def _pick_new_async(allow_multiple, file_type, allowed_extensions):
+        picker = new_picker or ft.FilePicker()
+        if hasattr(page, "services") and picker not in page.services:
+            try:
+                page.services.append(picker)
+            except Exception:
+                pass
         kw = {"allow_multiple": allow_multiple, "file_type": file_type}
         if allowed_extensions:
             kw["allowed_extensions"] = allowed_extensions
-        res = file_picker.pick_files(**kw)
-        if hasattr(res, "__await__"):
-            async def _wait_coro(coro):
-                files = await coro
-                if files:
-                    dispatch_picked_files([f.path for f in files if getattr(f, "path", None)])
-            page.run_task(_wait_coro, res)
+        files = await picker.pick_files(**kw)
+        if files:
+            dispatch_picked_files([f.path for f in files if getattr(f, "path", None)])
+
+    def pick_files_generic(allow_multiple=True, file_type=ft.FilePickerFileType.IMAGE, allowed_extensions=None):
+        if NEW_FLET:
+            page.run_task(_pick_new_async, allow_multiple, file_type, allowed_extensions)
+        else:
+            kw = {"allow_multiple": allow_multiple, "file_type": file_type}
+            if allowed_extensions:
+                kw["allowed_extensions"] = allowed_extensions
+            old_picker.pick_files(**kw)
 
     def show_import_sheet(new_doc):
         import_state["new_doc"] = new_doc
@@ -3388,4 +3470,8 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    _runner = getattr(ft, "run", None) or getattr(ft, "app", None)
+    try:
+        _runner(main)
+    except TypeError:
+        _runner(target=main)
