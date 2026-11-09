@@ -1,11 +1,18 @@
 """
-CS Scanner Pro V6.5 - Android APK & Mobile UI Edition
-- Đã cấu hình chuẩn cho Flet >= 0.70 (path = "src", pyproject.toml có quyền CAMERA)
-- Trên Android: Mở trình chọn Hệ thống có nút Máy ảnh (Camera) gốc siêu nét + Bộ sưu tập
-- Trên Windows PC: Mở trực tiếp Live Webcam với khung xanh nhận diện 4 góc giấy
-- Đầy đủ 10 tính năng: Nén PDF theo MB, Thùng rác 7 ngày, Cảnh báo ảnh mờ/tối,
-  Sao lưu/Khôi phục .ZIP, Đóng dấu Watermark tiếng Việt (Pillow), Che thông tin nhạy cảm,
-  Ghép 2/4/6 mặt vào 1 trang A4, Tách nền & Chèn chữ ký, Thư mục & Tìm kiếm.
+CS Scanner Pro V6.6 - Clean Mobile Edition (No Camera - 100% Stable)
+- Đã gỡ bỏ hoàn toàn tính năng Camera để chạy mượt 100% trên Android APK & PC
+- Tương thích hoàn toàn Flet 0.70+ (Android APK) và Flet 0.21 -> 0.25+ (Windows PC)
+- Giao diện Mobile tối ưu ngón cái: Bottom Bar gọn, Studio 3 Tab (Màu & Sáng | Cắt & Xoay | Bảo mật & Ghép)
+- Đầy đủ 9 tính năng:
+  1. Nén PDF tự động theo dung lượng mục tiêu (dưới X MB)
+  2. Thùng rác thông minh (lưu 7 ngày, khôi phục tài liệu & trang lẻ)
+  3. Cảnh báo ảnh mờ / thiếu sáng ngay khi tải lên
+  4. Sao lưu & Khôi phục toàn bộ dữ liệu ra file .zip
+  5. Đóng dấu chữ mờ (Watermark) hỗ trợ tiếng Việt (Pillow / OpenCV fallback)
+  6. Màn hình che thông tin nhạy cảm (Vẽ ô đen / Làm mờ Pixel / Xóa trắng, chạm vào ô để xóa)
+  7. Ghép 2, 4 hoặc 6 ảnh vào 1 trang A4 chuẩn
+  8. Tách nền chữ ký tự động từ ảnh & Kéo thả vị trí trực quan
+  9. Quản lý Thư mục (Folder), Tìm kiếm & Sắp xếp tài liệu
 """
 import base64
 import json
@@ -296,16 +303,16 @@ def full_corners(w, h):
     return np.array([[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]], dtype="float32")
 
 
-def detect_document_quad(img_bgr):
+def auto_detect_corners(img_bgr):
     h, w = img_bgr.shape[:2]
-    scale = 500.0 / max(h, w)
+    scale = 600.0 / max(h, w)
     small = cv2.resize(img_bgr, (max(1, int(w * scale)), max(1, int(h * scale))))
     sh, sw = small.shape[:2]
-    min_area = (sh * sw) * 0.14
+    min_area = (sh * sw) * 0.15
 
     gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-    blur = cv2.medianBlur(gray, 9)
-    blur = cv2.GaussianBlur(blur, (5, 5), 0)
+    blur = cv2.medianBlur(gray, 11)
+    blur = cv2.GaussianBlur(blur, (7, 7), 0)
 
     candidates = []
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -324,24 +331,19 @@ def detect_document_quad(img_bgr):
 
     for c in candidates:
         area = cv2.contourArea(c)
-        if area < min_area or area > (sh * sw * 0.97):
+        if area < min_area or area > (sh * sw * 0.98):
             continue
         hull = cv2.convexHull(c)
         peri = cv2.arcLength(hull, True)
         for eps in [0.015, 0.02, 0.03, 0.04, 0.05]:
             approx = cv2.approxPolyDP(hull, eps * peri, True)
             if len(approx) == 4:
-                return order_points(approx.reshape(4, 2) / scale), True
+                return order_points(approx.reshape(4, 2) / scale)
         if area > (sh * sw * 0.25):
             box_pts = cv2.boxPoints(cv2.minAreaRect(hull)) / scale
-            return order_points(box_pts), True
+            return order_points(box_pts)
 
-    return full_corners(w, h), False
-
-
-def auto_detect_corners(img_bgr):
-    corners, _ = detect_document_quad(img_bgr)
-    return corners
+    return full_corners(w, h)
 
 
 def warp_document(img_bgr, corners):
@@ -1110,10 +1112,10 @@ def compose_multi_grid_a4(imgs, layout=2, dpi=200):
 
 
 # =====================================================================
-# 6. GIAO DIỆN ĐIỆN THOẠI (MOBILE-FIRST UI)
+# 6. GIAO DIỆN ĐIỆN THOẠI (MOBILE-FIRST UI - NO CAMERA)
 # =====================================================================
 def main(page: ft.Page):
-    page.title = "CS Scanner Pro V6.5"
+    page.title = "CS Scanner Pro V6.6"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
     page.bgcolor = "#EEF2F5"
@@ -1122,14 +1124,6 @@ def main(page: ft.Page):
         page.window.height = 880
     except Exception:
         pass
-
-    # Nhận diện môi trường Điện thoại Android / iOS
-    IS_MOBILE_OS = (
-        str(getattr(page, "platform", "")).lower().endswith(("android", "ios"))
-        or "ANDROID_ARGUMENT" in os.environ
-        or "FLET_APP_STORAGE_DATA" in os.environ
-        or os.path.isdir("/storage/emulated/0")
-    )
 
     CS_TEAL, CS_DARK, CS_ACCENT, CS_ORANGE = "#00897B", "#182026", "#00BFA5", "#E65100"
     WHITE = Colors.WHITE
@@ -1149,7 +1143,6 @@ def main(page: ft.Page):
         "busy": False,
         "pending": None,
         "picker_mode": "import_images",
-        "cam_running": False,
     }
     try:
         app_data["docs"] = load_all_docs()
@@ -1763,7 +1756,6 @@ def main(page: ft.Page):
         return res
 
     def render_home_view():
-        app_data["cam_running"] = False
         page.floating_action_button = None
         docs_list_col.controls.clear()
         sel_count = sum(1 for d in app_data["docs"] if d.get("selected"))
@@ -1837,7 +1829,7 @@ def main(page: ft.Page):
                 docs_list_col.controls.append(ft.Container(height=320, alignment=ALIGN_CENTER, content=ft.Column([
                     ft.Icon(Icons.DOCUMENT_SCANNER_ROUNDED, size=68, color="#B0BEC5"),
                     ft.Text("Chưa có tài liệu nào", size=15, weight=ft.FontWeight.BOLD, color="#546E7A"),
-                    ft.Text("Bấm nút '📸 Chụp Quét' hoặc '🖼️ Tải Ảnh' ở thanh dưới", size=12, color="#78909C"),
+                    ft.Text("Bấm nút '➕ Tải Ảnh & Tự Cắt Nền' ở thanh dưới cùng", size=12, color="#78909C"),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER)))
             else:
                 for idx, doc in vis:
@@ -1902,34 +1894,22 @@ def main(page: ft.Page):
 
         bottom_action_bar = ft.Container(
             bgcolor=WHITE,
-            padding=pad_sym(12, 8),
+            padding=pad_sym(14, 10),
             border=border_all(1, "#CFD8DC"),
             content=ft.Row([
                 ft.Container(
                     expand=True,
-                    height=46,
-                    bgcolor=CS_ORANGE,
-                    border_radius=23,
-                    alignment=ALIGN_CENTER,
-                    on_click=lambda _: open_camera_screen(new_doc=True, auto_crop=True, mode="doc"),
-                    content=ft.Row([
-                        ft.Icon(Icons.PHOTO_CAMERA, color=WHITE, size=20),
-                        ft.Text("Chụp Quét", color=WHITE, weight=ft.FontWeight.BOLD, size=14),
-                    ], alignment=ft.MainAxisAlignment.CENTER, spacing=6),
-                ),
-                ft.Container(
-                    expand=True,
-                    height=46,
+                    height=48,
                     bgcolor=CS_TEAL,
-                    border_radius=23,
+                    border_radius=24,
                     alignment=ALIGN_CENTER,
                     on_click=lambda _: show_import_sheet(True),
                     content=ft.Row([
-                        ft.Icon(Icons.ADD_PHOTO_ALTERNATE, color=WHITE, size=20),
-                        ft.Text("Tải Ảnh Lên", color=WHITE, weight=ft.FontWeight.BOLD, size=14),
-                    ], alignment=ft.MainAxisAlignment.CENTER, spacing=6),
+                        ft.Icon(Icons.ADD_PHOTO_ALTERNATE, color=WHITE, size=22),
+                        ft.Text("Tải Ảnh Lên & Tự Cắt Nền", color=WHITE, weight=ft.FontWeight.BOLD, size=15),
+                    ], alignment=ft.MainAxisAlignment.CENTER, spacing=8),
                 ),
-            ], spacing=10),
+            ]),
         )
 
         root_body.content = ft.Column([
@@ -2381,7 +2361,6 @@ def main(page: ft.Page):
         page.update()
 
     def open_doc_studio(doc_idx, keep_page=False):
-        app_data["cam_running"] = False
         app_data["current_doc_idx"] = doc_idx
         page.floating_action_button = None
         doc = app_data["docs"][doc_idx]
@@ -2471,18 +2450,11 @@ def main(page: ft.Page):
                             ft.TextButton("☑️ Tất cả", on_click=lambda _: set_all_pages_checkbox(True)),
                             ft.TextButton("⬜ Bỏ chọn", on_click=lambda _: set_all_pages_checkbox(False)),
                         ], spacing=0),
-                        ft.Row([
-                            ft.Container(
-                                bgcolor=CS_ORANGE, padding=pad_sym(10, 5), border_radius=14,
-                                on_click=lambda _: open_camera_screen(new_doc=False, auto_crop=True, mode="doc"),
-                                content=ft.Text("📸 +Chụp", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
-                            ),
-                            ft.Container(
-                                bgcolor=CS_TEAL, padding=pad_sym(10, 5), border_radius=14,
-                                on_click=lambda _: show_import_sheet(False),
-                                content=ft.Text("🖼️ +Ảnh", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
-                            ),
-                        ], spacing=6),
+                        ft.Container(
+                            bgcolor=CS_TEAL, padding=pad_sym(12, 6), border_radius=14,
+                            on_click=lambda _: show_import_sheet(False),
+                            content=ft.Text("➕ Thêm Ảnh", color=WHITE, size=11, weight=ft.FontWeight.BOLD),
+                        ),
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     page_strip_row,
                 ], spacing=2, tight=True),
@@ -2803,7 +2775,7 @@ def main(page: ft.Page):
         redraw()
 
     # =================================================================
-    # MÀN HÌNH 5: TÁCH NỀN & CHÈN CHỮ KÝ
+    # MÀN HÌNH 5: TÁCH NỀN & CHÈN CHỮ KÝ TỪ ẢNH
     # =================================================================
     def list_saved_signatures():
         if not os.path.isdir(SIG_DIR):
@@ -2872,12 +2844,9 @@ def main(page: ft.Page):
             app_data["picker_mode"] = "import_sig"
             pick_files_generic(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE)
 
-        def capture_sig_from_cam(_):
-            open_camera_screen(new_doc=False, auto_crop=False, mode="sig")
-
         def save_sig_to_page(_):
             if not active_sig.get("file"):
-                toast("⚠️ Hãy chụp hoặc chọn ảnh chữ ký trước!", Colors.ORANGE_800)
+                toast("⚠️ Hãy bấm '🖼️ Tải ảnh chữ ký' trước!", Colors.ORANGE_800)
                 return
             snapshot_doc(doc)
             pg["signatures"] = current_sig_list()
@@ -2900,6 +2869,14 @@ def main(page: ft.Page):
             run_bg(work, lambda _: (open_doc_studio(app_data["current_doc_idx"], keep_page=True),
                                     toast("🗑️ Đã gỡ chữ ký!")))
 
+        sig_dd = ft.Dropdown(
+            width=150,
+            label="Mẫu đã lưu",
+            value=active_sig.get("file", ""),
+            options=[DDOpt(key=f, text=f) for f in sigs],
+            on_change=lambda e: (active_sig.update({"file": e.control.value or ""}), redraw(), page.update()),
+        )
+
         redraw()
         root_body.content = ft.Container(bgcolor=CS_DARK, expand=True, content=ft.Column([
             ft.Container(padding=pad_sym(8, 8), bgcolor="#11171A", content=ft.Row([
@@ -2908,7 +2885,7 @@ def main(page: ft.Page):
                 ft.Text(f"Chèn Chữ Ký - Trang {p_idx + 1}", color=WHITE, weight=ft.FontWeight.BOLD, expand=True),
                 Btn("Gắn ✓", bgcolor=CS_TEAL, color=WHITE, on_click=save_sig_to_page),
             ])),
-            ft.Text("Kéo nút tròn ✥ để đặt chữ ký vào vị trí mong muốn", color="#B0BEC5", size=12),
+            ft.Text("Kéo nút tròn ✥ để đặt chữ ký vào vị trí mong muốn (Tự động tách nền trắng)", color="#B0BEC5", size=12),
             ft.Container(
                 expand=True, alignment=ALIGN_CENTER,
                 content=ft.Stack(width=cw, height=ch, controls=[sig_preview, sig_handle]),
@@ -2916,407 +2893,13 @@ def main(page: ft.Page):
             ft.Container(bgcolor="#11171A", padding=10, content=ft.Column([
                 ft.Row([ft.Text("Độ lớn:", color=WHITE, size=12), size_slider]),
                 ft.Row([
-                    Btn("📸 Chụp Ký", bgcolor=CS_ORANGE, color=WHITE, on_click=capture_sig_from_cam),
-                    Btn("🖼️ Chọn Ảnh", bgcolor=CS_TEAL, color=WHITE, on_click=import_new_sig),
+                    Btn("🖼️ Tải ảnh chữ ký", bgcolor=CS_TEAL, color=WHITE, on_click=import_new_sig),
+                    sig_dd,
                     OutBtn("🗑️ Gỡ", on_click=clear_sigs),
-                ], alignment=ft.MainAxisAlignment.SPACE_EVENLY),
+                ], alignment=ft.MainAxisAlignment.SPACE_EVENLY, scroll=ft.ScrollMode.AUTO),
             ], tight=True, spacing=6)),
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, expand=True))
         page.update()
-
-    # =================================================================
-    # MÀN HÌNH 6: CAMERA TRÊN ĐIỆN THOẠI ANDROID & LIVE WEBCAM TRÊN PC
-    # =================================================================
-    def open_android_camera_sheet(new_doc=True, auto_crop=True, folder="Chung", mode="doc"):
-        """
-        Trên Android, gọi FilePickerFileType.ANY sẽ mở trình DocumentsUI gốc của hệ thống
-        có sẵn biểu tượng '📷 Máy ảnh (Camera)' để chụp trực tiếp bằng Camera gốc của điện thoại.
-        """
-        def trigger_cam_intent(use_any_type):
-            close_dlg(bs_cam)
-            if mode == "sig":
-                app_data["picker_mode"] = "import_sig"
-                pick_files_generic(
-                    allow_multiple=False,
-                    file_type=ft.FilePickerFileType.ANY if use_any_type else ft.FilePickerFileType.IMAGE,
-                )
-            else:
-                import_state["new_doc"] = new_doc
-                import_state["auto"] = auto_crop
-                import_state["folder"] = folder
-                app_data["picker_mode"] = "import_images"
-                pick_files_generic(
-                    allow_multiple=True,
-                    file_type=ft.FilePickerFileType.ANY if use_any_type else ft.FilePickerFileType.IMAGE,
-                )
-
-        bs_cam = ft.BottomSheet(
-            ft.Container(
-                padding=18, bgcolor=WHITE, border_radius=16,
-                content=ft.Column([
-                    ft.Text("📸 Chụp Quét Tài Liệu", weight=ft.FontWeight.BOLD, size=16, color=CS_DARK),
-                    ft.Text(
-                        "Mẹo trên Android: Khi bảng hệ thống hiện ra, bấm vào biểu tượng '📷 Máy ảnh (Camera)' để chụp nét nhất, hoặc chọn ngay các ảnh vừa chụp.",
-                        size=12, color="#455A64",
-                    ),
-                    ft.Container(
-                        bgcolor="#FFF3E0", border_radius=12, padding=12,
-                        border=border_all(1.5, CS_ORANGE),
-                        on_click=lambda _: trigger_cam_intent(True),
-                        content=ft.Row([
-                            ft.Icon(Icons.PHOTO_CAMERA, color=CS_ORANGE, size=30),
-                            ft.Column([
-                                ft.Text("Mở Máy ảnh / Tệp hệ thống (Có nút 📷 Camera)", weight=ft.FontWeight.BOLD, size=13, color=CS_ORANGE),
-                                ft.Text("Chọn 'Máy ảnh' trên màn hình kế tiếp để chụp trực tiếp", size=11, color="#455A64"),
-                            ], spacing=2, expand=True),
-                        ], spacing=10),
-                    ),
-                    ft.Container(
-                        bgcolor="#E0F2F1", border_radius=12, padding=12,
-                        on_click=lambda _: trigger_cam_intent(False),
-                        content=ft.Row([
-                            ft.Icon(Icons.COLLECTIONS, color=CS_TEAL, size=28),
-                            ft.Column([
-                                ft.Text("Mở nhanh Bộ sưu tập Ảnh gần đây", weight=ft.FontWeight.BOLD, size=13, color=CS_TEAL),
-                                ft.Text("Chọn 1 hoặc nhiều ảnh tài liệu đã chụp", size=11, color="#455A64"),
-                            ], spacing=2, expand=True),
-                        ], spacing=10),
-                    ),
-                ], tight=True, spacing=10),
-            )
-        )
-        open_dlg(bs_cam)
-
-    def open_camera_screen(new_doc=True, auto_crop=True, folder="Chung", mode="doc"):
-        # Trên Android / iOS: dùng thẳng trình Máy ảnh hệ thống để không bị lỗi đen màn hình cv2.VideoCapture
-        if IS_MOBILE_OS:
-            open_android_camera_sheet(new_doc=new_doc, auto_crop=auto_crop, folder=folder, mode=mode)
-            return
-
-        page.floating_action_button = None
-        app_data["cam_running"] = True
-
-        cam_state = {
-            "cam_idx": 0,
-            "cap": None,
-            "last_raw": None,
-            "captured_frames": [],
-            "auto_guide": (mode == "doc" and auto_crop),
-            "mirror": False,
-            "rot": 0,
-            "switching": False,
-            "quad": None,
-            "found_doc": False,
-            "blur_val": 120.0,
-            "lum_val": 140.0,
-        }
-
-        cam_view_img = make_img(expand=True, fit=FIT.CONTAIN)
-        cam_status_txt = ft.Text("⏳ Đang mở Camera...", color="#A7FFEB", size=12, weight=ft.FontWeight.BOLD)
-        cam_quality_txt = ft.Text("", color="#FFE082", size=11, weight=ft.FontWeight.BOLD)
-        captured_strip = ft.Row(scroll=ft.ScrollMode.AUTO, spacing=6, height=62)
-        done_badge_txt = ft.Text("Lưu (0) ✓", color=WHITE, weight=ft.FontWeight.BOLD, size=13)
-
-        def release_cam():
-            app_data["cam_running"] = False
-            cap = cam_state.get("cap")
-            cam_state["cap"] = None
-            if cap is not None:
-                try:
-                    cap.release()
-                except Exception:
-                    pass
-
-        def open_capture_device(idx):
-            old = cam_state.get("cap")
-            if old is not None:
-                try:
-                    old.release()
-                except Exception:
-                    pass
-            cap = None
-            try:
-                if os.name == "nt" and hasattr(cv2, "CAP_DSHOW"):
-                    cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
-                    if not cap or not cap.isOpened():
-                        cap = cv2.VideoCapture(idx)
-                else:
-                    cap = cv2.VideoCapture(idx)
-                if cap and cap.isOpened():
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-                    return cap
-            except Exception:
-                pass
-            return None
-
-        def fallback_system_picker(_=None):
-            release_cam()
-            open_android_camera_sheet(new_doc=new_doc, auto_crop=auto_crop, folder=folder, mode=mode)
-
-        def refresh_captured_strip():
-            captured_strip.controls.clear()
-            n = len(cam_state["captured_frames"])
-            done_badge_txt.value = f"Lưu ({n}) ✓"
-            for idx_f, frm in enumerate(cam_state["captured_frames"]):
-                th = fit_max(frm, 110)
-                b64 = img_to_b64(th, 75)
-                captured_strip.controls.append(
-                    ft.Container(
-                        width=50, height=58, padding=2, bgcolor="#263238", border_radius=6,
-                        content=ft.Stack([
-                            make_img(b64, width=46, height=54, fit=FIT.COVER),
-                            ft.GestureDetector(
-                                right=0, top=0,
-                                on_tap=lambda e, i=idx_f: remove_captured(i),
-                                content=ft.Container(
-                                    width=16, height=16, bgcolor=Colors.RED_700, border_radius=8,
-                                    alignment=ALIGN_CENTER,
-                                    content=ft.Text("×", color=WHITE, size=10, weight=ft.FontWeight.BOLD),
-                                ),
-                            ),
-                        ]),
-                    )
-                )
-
-        def remove_captured(idx_f):
-            if 0 <= idx_f < len(cam_state["captured_frames"]):
-                cam_state["captured_frames"].pop(idx_f)
-                refresh_captured_strip()
-                page.update()
-
-        def switch_camera(_):
-            cam_state["cam_idx"] = (cam_state["cam_idx"] + 1) % 3
-            cam_state["switching"] = True
-            cam_status_txt.value = f"🔄 Đang chuyển Cam #{cam_state['cam_idx']}..."
-            page.update()
-
-        def snap_photo(_=None):
-            raw = cam_state.get("last_raw")
-            if raw is None:
-                fallback_system_picker()
-                return
-            frame_copy = raw.copy()
-
-            if mode == "sig":
-                release_cam()
-
-                def work_sig():
-                    rgba = extract_signature_rgba(frame_copy)
-                    fn = f"sig_{int(time.time())}.png"
-                    write_png(os.path.join(SIG_DIR, fn), rgba)
-                    return fn
-
-                def done_sig(fn):
-                    doc = cur_doc()
-                    pg = doc["pages"][app_data["active_page_idx"]]
-                    pg.setdefault("signatures", []).append(
-                        {"file": fn, "x": 0.72, "y": 0.82, "w": 0.30, "opacity": 0.95}
-                    )
-                    open_signature_screen(app_data["active_page_idx"])
-                    toast("✍️ Đã chụp & tách nền chữ ký!")
-
-                run_bg(work_sig, done_sig)
-                return
-
-            cam_state["captured_frames"].append(frame_copy)
-            refresh_captured_strip()
-            q_check = analyze_image_quality(frame_copy)
-            if q_check["is_blur"]:
-                toast(f"⚠️ Trang #{len(cam_state['captured_frames'])} hơi MỜ! Bấm × trên ảnh nhỏ nếu muốn chụp lại.", Colors.ORANGE_900)
-            else:
-                toast(f"📸 Đã chụp trang #{len(cam_state['captured_frames'])}!")
-            page.update()
-
-        def finish_capture(_=None):
-            frames = list(cam_state["captured_frames"])
-            if not frames:
-                toast("⚠️ Hãy bấm nút tròn ở giữa để chụp ít nhất 1 trang!", Colors.ORANGE_800)
-                return
-            use_crop = bool(cam_state["auto_guide"])
-            release_cam()
-
-            def work():
-                out = []
-                for idx_f, frm in enumerate(frames):
-                    out.append(
-                        create_page_from_raw(
-                            frm,
-                            auto_crop=use_crop,
-                            name=f"Cam_{time.strftime('%H%M%S')}_{idx_f + 1}.jpg",
-                        )
-                    )
-                return out
-
-            def done(new_pages):
-                if new_doc or app_data["current_doc_idx"] < 0 or not app_data["docs"]:
-                    doc = new_doc_record(f"Scan Camera #{len(app_data['docs']) + 1}", new_pages, folder=folder)
-                    app_data["docs"].insert(0, doc)
-                    save_doc(doc)
-                    open_doc_studio(0)
-                else:
-                    doc = cur_doc()
-                    doc["pages"].extend(new_pages)
-                    doc["undo"].clear()
-                    save_doc(doc)
-                    open_doc_studio(app_data["current_doc_idx"], keep_page=True)
-                toast(f"🎯 Đã lưu {len(new_pages)} trang!")
-
-            run_bg(work, done)
-
-        def cancel_camera(_=None):
-            release_cam()
-            if mode == "sig":
-                open_signature_screen(app_data["active_page_idx"])
-            elif not new_doc and app_data["current_doc_idx"] >= 0 and app_data["docs"]:
-                open_doc_studio(app_data["current_doc_idx"], keep_page=True)
-            else:
-                render_home_view()
-
-        def camera_loop():
-            cap = open_capture_device(cam_state["cam_idx"])
-            if cap is None and cam_state["cam_idx"] != 0:
-                cam_state["cam_idx"] = 0
-                cap = open_capture_device(0)
-            cam_state["cap"] = cap
-
-            if cap is None:
-                cam_status_txt.value = "📱 Chế độ Máy ảnh Hệ thống"
-                cam_quality_txt.value = "Bấm nút tròn màu cam bên dưới để mở Máy ảnh / Thư viện"
-                try:
-                    page.update()
-                except Exception:
-                    pass
-                return
-
-            cam_status_txt.value = f"🟢 Cam #{cam_state['cam_idx']}"
-            frame_counter = 0
-
-            while app_data.get("cam_running", False):
-                if cam_state.get("switching"):
-                    cam_state["switching"] = False
-                    new_cap = open_capture_device(cam_state["cam_idx"])
-                    if new_cap is None:
-                        cam_state["cam_idx"] = 0
-                        new_cap = open_capture_device(0)
-                    cam_state["cap"] = new_cap
-                    cap = new_cap
-                    if cap is None:
-                        break
-                    cam_status_txt.value = f"🟢 Cam #{cam_state['cam_idx']}"
-
-                ok, frame = cap.read()
-                if not ok or frame is None:
-                    time.sleep(0.05)
-                    continue
-
-                if cam_state["mirror"]:
-                    frame = cv2.flip(frame, 1)
-                rot = cam_state["rot"] % 360
-                if rot == 90:
-                    frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-                elif rot == 180:
-                    frame = cv2.rotate(frame, cv2.ROTATE_180)
-                elif rot == 270:
-                    frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-                cam_state["last_raw"] = frame
-                disp = fit_max(frame, 640).copy()
-                dh, dw = disp.shape[:2]
-
-                frame_counter += 1
-                if frame_counter % 4 == 0:
-                    gray_s = cv2.cvtColor(disp, cv2.COLOR_BGR2GRAY)
-                    cam_state["blur_val"] = float(cv2.Laplacian(gray_s, cv2.CV_64F).var())
-                    cam_state["lum_val"] = float(np.mean(gray_s))
-                    if cam_state["auto_guide"]:
-                        quad, found = detect_document_quad(disp)
-                        cam_state["quad"] = quad
-                        cam_state["found_doc"] = found
-                    else:
-                        cam_state["found_doc"] = False
-
-                if cam_state["auto_guide"] and cam_state.get("quad") is not None and cam_state.get("found_doc"):
-                    pts = np.array(cam_state["quad"], dtype=np.int32)
-                    overlay = disp.copy()
-                    cv2.fillPoly(overlay, [pts], (160, 220, 0))
-                    cv2.addWeighted(overlay, 0.18, disp, 0.82, 0, disp)
-                    cv2.polylines(disp, [pts], True, (0, 230, 118), 3, cv2.LINE_AA)
-                elif mode == "sig":
-                    sx1, sy1 = int(dw * 0.12), int(dh * 0.30)
-                    sx2, sy2 = int(dw * 0.88), int(dh * 0.70)
-                    cv2.rectangle(disp, (sx1, sy1), (sx2, sy2), (0, 230, 118), 2)
-
-                b_val, l_val = cam_state["blur_val"], cam_state["lum_val"]
-                q_tags = ["⚠️ Rung tay" if b_val < 55 else "✅ Nét"]
-                if l_val < 70:
-                    q_tags.append("⚠️ Hơi tối")
-                if cam_state["auto_guide"]:
-                    q_tags.append("🎯 Đã bắt khung" if cam_state["found_doc"] else "🔍 Tìm mép giấy")
-                cam_quality_txt.value = " • ".join(q_tags)
-
-                set_img(cam_view_img, img_to_b64(disp, 78))
-                try:
-                    cam_view_img.update()
-                    cam_quality_txt.update()
-                except Exception:
-                    page.update()
-
-                time.sleep(0.035)
-
-            release_cam()
-
-        shutter_button = ft.GestureDetector(
-            on_tap=snap_photo,
-            content=ft.Container(
-                width=72, height=72, border_radius=36,
-                border=border_all(4, WHITE),
-                padding=4,
-                alignment=ALIGN_CENTER,
-                content=ft.Container(width=56, height=56, border_radius=28, bgcolor=CS_ORANGE),
-            ),
-        )
-
-        root_body.content = ft.Container(bgcolor="#0B0F12", expand=True, content=ft.Column([
-            ft.Container(padding=pad_sym(8, 6), bgcolor="#11171A", content=ft.Row([
-                ft.IconButton(Icons.CLOSE, icon_color=WHITE, on_click=cancel_camera),
-                ft.Column([cam_status_txt, cam_quality_txt], spacing=1, expand=True,
-                          horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                ft.IconButton(Icons.ROTATE_90_DEGREES_CW, icon_color=WHITE, tooltip="Xoay khung ngắm",
-                              on_click=lambda _: cam_state.update({"rot": (cam_state["rot"] + 90) % 360})),
-                ft.IconButton(Icons.FLIP, icon_color=WHITE, tooltip="Lật gương",
-                              on_click=lambda _: cam_state.update({"mirror": not cam_state["mirror"]})),
-            ])),
-
-            ft.Container(expand=True, alignment=ALIGN_CENTER, content=cam_view_img),
-
-            ft.Container(padding=pad_sym(10, 2), content=captured_strip) if mode == "doc" else ft.Container(),
-
-            ft.Container(
-                bgcolor="#11171A",
-                padding=pad_sym(18, 12),
-                content=ft.Row([
-                    ft.Container(
-                        width=86, height=42, border_radius=21, bgcolor="#263238",
-                        alignment=ALIGN_CENTER, on_click=switch_camera,
-                        content=ft.Row([
-                            ft.Icon(Icons.REFRESH, color=WHITE, size=18),
-                            ft.Text("Đổi Cam", color=WHITE, size=12, weight=ft.FontWeight.BOLD),
-                        ], alignment=ft.MainAxisAlignment.CENTER, spacing=4),
-                    ),
-                    shutter_button,
-                    ft.Container(
-                        width=86, height=42, border_radius=21, bgcolor=CS_TEAL,
-                        alignment=ALIGN_CENTER,
-                        on_click=finish_capture if mode == "doc" else snap_photo,
-                        content=done_badge_txt if mode == "doc" else ft.Text("Chụp Ký", color=WHITE, size=12, weight=ft.FontWeight.BOLD),
-                    ),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-            ),
-        ], expand=True, spacing=0))
-        page.update()
-
-        threading.Thread(target=camera_loop, daemon=True).start()
 
     # =================================================================
     # 7. TẢI ẢNH LÊN & HỆ THỐNG FILE PICKER ĐA NỀN TẢNG (0.2x + 0.70+ APK)
