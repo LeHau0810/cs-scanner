@@ -1,6 +1,6 @@
 [project]
 name = "cs-scanner"
-version = "6.5.0"
+version = "6.6.0"
 description = "CS Scanner Pro"
 requires-python = ">=3.10"
 dependencies = [
@@ -18,7 +18,6 @@ org = "com.cs"
 path = "src"
 
 [tool.flet.android.permission]
-"android.permission.CAMERA" = true
 "android.permission.READ_MEDIA_IMAGES" = true
 "android.permission.READ_EXTERNAL_STORAGE" = true
 "android.permission.WRITE_EXTERNAL_STORAGE" = true
